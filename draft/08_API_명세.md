@@ -59,8 +59,19 @@
 | DELETE | `/records/{recordId}` | Record 소프트 삭제 |
 | POST | `/records/{recordId}/contexts` | Context 추가 |
 | GET | `/records/{recordId}/contexts` | Context 목록 조회 |
-| PUT | `/records/{recordId}/contexts/{contextId}` | Context 수정 |
+| PUT | `/records/{recordId}/contexts/{contextId}` | Context 수정. 내부적으로 구 Context 삭제 + 신 Context 생성이며 **새 contextId를 반환** |
 | DELETE | `/records/{recordId}/contexts/{contextId}` | Context 삭제 |
+
+Context는 불변입니다. 수정 Endpoint는 형태를 유지하지만 서버 내부에서는 구 Context를 소프트 삭제하고 새 Context를 생성합니다.
+
+```text
+PUT /records/{recordId}/contexts/{contextId}
+→ 구 Context 삭제 및 AI 취소
+→ 신 Context 생성
+→ 응답에 새 contextId 반환
+```
+
+**구 `contextId`를 그대로 반환하는 응답 계약은 허용하지 않습니다.** Client는 응답의 새 `contextId`를 반영해야 하며, 구 `contextId`로 재조회하거나 이를 캐시 키로 계속 사용해서는 안 됩니다. 자세한 내용은 [AI 설계](../static/05_AI_설계.md)의 Context 불변성을 따릅니다.
 | GET | `/records/{recordId}/collections` | 연결된 Collection 조회 |
 
 ## 4. AI 자연어 검색

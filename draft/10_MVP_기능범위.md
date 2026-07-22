@@ -35,7 +35,8 @@
 - Context 단위 Embedding 생성
 - AI 프리셋 Keyword 매핑과 LLM 판정
 - Keyword 공개 등급(`PUBLIC` / `PRIVATE_ONLY` / `BLOCKED`)
-- AI State와 Context Version 경합 방어
+- Context 불변 모델(수정 = 삭제 + 생성)
+- AI State 기반 삭제·수정 경합 방어
 - 부분 재개와 Spring 재스캔
 - 본인 Context 기반 정확 벡터 검색
 - Record 단위 중복 제거와 결과 반환
