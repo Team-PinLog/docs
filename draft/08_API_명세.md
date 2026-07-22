@@ -5,8 +5,26 @@
 기본 경로:
 
 ```text
-/api/v1
+/api/core/v1
 ```
+
+이 경로는 두 조각으로 구성됩니다.
+
+| 조각 | 값 | 소유 |
+|---|---|---|
+| 서비스 prefix | `/api/core` | `server.servlet.context-path` |
+| API 버전 | `/v1` | 컨트롤러 매핑 |
+
+버전을 `context-path`가 아니라 컨트롤러 매핑에 두는 이유는 운영 엔드포인트를 버전에서 분리하기 위해서입니다. `context-path`에 버전을 넣으면 actuator도 `/api/core/v1/actuator/*`로 내려가, API 버전을 올릴 때마다 프로브와 메트릭 수집 경로까지 바뀝니다.
+
+따라서 운영 엔드포인트는 버전 없이 유지합니다.
+
+```text
+/api/core/actuator/health
+/api/core/actuator/prometheus
+```
+
+서비스 prefix는 Ingress 경로와 일치해야 하며 StripPrefix를 사용하지 않습니다. 아래 표의 Endpoint는 모두 기본 경로에 이어붙인 상대 경로입니다.
 
 이 문서가 다루는 범위는 Client가 호출하는 외부 API입니다. Spring과 FastAPI 사이의 내부 API(`/internal/v1/*`)는 여기에 정의하지 않으며, 논리 계약은 [AI 설계](../static/05_AI_설계.md)의 내부 API 계약을 따릅니다. Client는 FastAPI를 직접 호출하지 않습니다.
 
