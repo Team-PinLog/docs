@@ -24,15 +24,23 @@
 - Context 복수 생성·조회·수정·삭제
 - 마지막 Context 삭제 시 Record 삭제 확인
 - 삭제한 Place 재저장 시 새 Record 생성
-- Record 재생성 시 Collection 연결 승계와 전체 활성 Context 재임베딩
+- Record 재생성 시 Collection 연결 승계
 
 ### Keyword와 AI 자연어 검색
 
-- AI 프리셋 Keyword 매핑과 비식별화
-- Keyword 조회
-- Place·Context·Keyword 기반 검색
+세부 설계는 [AI 설계](../static/05_AI_설계.md)를 따릅니다.
+
+- Spring과 FastAPI 분리
+- Context 단위 비동기 AI 처리
+- Context 단위 Embedding 생성
+- AI 프리셋 Keyword 매핑과 LLM 판정
+- Keyword 공개 등급(`PUBLIC` / `PRIVATE_ONLY` / `BLOCKED`)
+- AI State와 Context Version 경합 방어
+- 부분 재개와 Spring 재스캔
+- 본인 Context 기반 정확 벡터 검색
 - Record 단위 중복 제거와 결과 반환
 - 검색 결과 없음 처리
+- AI 미완료·실패 시 Keyword만 생략
 
 ### Collection
 
@@ -54,7 +62,8 @@
 
 ### Feed와 공개
 
-- 발행 Collection 추천·상세 조회
+- Spring 규칙 기반 발행 Collection 추천·상세 조회
+- Redis 기반 Feed Cache와 노출·클릭·저장 이벤트 수집
 - 같은 Shelf의 다른 Collection 조회
 - Feed에서 Shelf Follow
 - Place 선택 후 내 Record 생성 또는 Context 추가
@@ -79,3 +88,13 @@
 - 카카오톡 대화 분석
 - 사진 메타데이터 기반 자동 Place 등록
 - 그룹 Library
+
+### AI 기술 범위 제외
+
+- 메시지 큐(Kafka, RabbitMQ)와 별도 Outbox
+- ANN 인덱스(HNSW, IVFFlat)
+- RAG, GraphRAG
+- 자유 생성 공개 Keyword
+- 검색어 LLM 분해
+- 학습형 Feed Ranking과 Multi-Armed Bandit
+- 자동 Collection Keyword 물리 집계
