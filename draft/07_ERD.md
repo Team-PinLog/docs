@@ -60,9 +60,7 @@ erDiagram
         bigint record_id FK
         bigint member_id FK "비정규화: 검색 범위 필터"
         text body "개인정보, 타인 미공개"
-        int body_version "body 수정 시에만 증가"
         timestamptz created_at
-        timestamptz updated_at
         timestamptz deleted_at
     }
 
@@ -108,7 +106,6 @@ erDiagram
 
     CONTEXT_REF {
         bigint id PK "core.context 참조"
-        int body_version
     }
 
     KEYWORD_PRESET {
@@ -126,8 +123,7 @@ erDiagram
 
     CONTEXT_EMBEDDING {
         bigint id PK
-        bigint context_id FK
-        int context_version "stale 판별"
+        bigint context_id FK "UNIQUE"
         vector embedding "HNSW 인덱스"
         varchar model
         varchar status "PENDING/DONE/FAILED"
@@ -137,13 +133,14 @@ erDiagram
     CONTEXT_KEYWORD {
         bigint context_id FK
         bigint keyword_id FK
-        int context_version
         decimal confidence
         int preset_version
     }
 ```
 
 `CONTEXT_REF`는 다이어그램 표현을 위한 `core.context` 참조이며 실제 테이블이 아닙니다.
+
+파이프라인 처리 단위는 Context입니다. Context가 불변이고 작업이 Context 단위로 격리되므로, 완료 순서가 뒤바뀌어도 서로의 결과를 덮어쓰지 않습니다. 따라서 버전 컬럼을 두지 않습니다. 유일한 경합은 처리 중 Context가 삭제되는 경우이며, 워커가 쓰기 직전 생존을 확인하는 것으로 방어합니다.
 
 ## 3. 물리 테이블이 아닌 개념
 
@@ -187,10 +184,13 @@ Keyword는 Context 단위로만 저장합니다. Record 단위로 저장하면 C
 
 DB 제약으로 표현할 수 없어 서비스 트랜잭션과 행 잠금으로 보장합니다.
 
-- 활성 Record는 활성 Context를 1개 이상 가집니다. 마지막 Context는 개별 삭제할 수 없습니다.
-- 활성 Collection은 활성 Record를 1개 이상 가집니다. 마지막 Record는 개별 제거할 수 없습니다.
+- 활성 Record는 활성 Context를 1개 이상 가집니다. 마지막 Context 삭제 요청은 Record 삭제로 승격합니다.
+- 활성 Collection은 활성 Record를 1개 이상 가집니다. 마지막 연결 제거 요청은 Collection 삭제로 승격합니다.
 - Record 삭제 시, 해당 Record가 마지막이던 Collection은 자동 삭제합니다.
+- Context 수정은 추가를 먼저 하고 삭제를 나중에 수행하여 빈 Record 상태를 만들지 않습니다.
 - `collection.record_count`는 연결 추가·제거와 동일 트랜잭션에서 갱신합니다.
+
+활성 수를 세고 그 결과로 분기하는 작업은 부모 행(`record`, `collection`)을 잠근 뒤 수행합니다. 자식 행 잠금은 서로 다른 자식을 대상으로 할 때 겹치지 않아 경합을 막지 못합니다.
 
 ## 5. 삭제 방식 요약
 
