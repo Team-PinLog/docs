@@ -7,7 +7,7 @@ PinLog은 장소를 저장한 이유와 경험을 `Context`로 남기고, 나중
 ## 2. 핵심 구조
 
 ```text
-User + Place = 활성 Record 최대 1개
+User별 동일 Place의 활성 Record는 최대 1개
 Record = Place + Context 1개 이상 + Keyword
 Collection = Record 1개 이상
 Shelf = 한 User가 발행한 Collection 목록
@@ -23,16 +23,17 @@ Feed = 익명 Collection 추천 영역
 카카오맵에서 Place 검색
 → Place 선택
 → Context 작성
-→ Record 생성
-→ Keyword 매핑 및 임베딩 생성
+→ Record 저장
+→ 서비스가 Keyword 매핑 및 임베딩 생성
 ```
 
 ### 검색
 
 ```text
-자연어 질의
-→ 내 Place·Context·Keyword 검색
-→ Record 단위 결과 반환
+자연어 질의 입력
+→ 서비스가 내 Place·Context·Keyword 검색
+→ 관련 Record 목록 표시
+→ 원하는 Record 확인
 ```
 
 예: “비 오는 날 친구와 가려고 저장한 카페”
@@ -53,17 +54,9 @@ Feed에서 Collection 확인
 
 - Context 없는 Record와 Record 없는 Collection은 허용하지 않습니다.
 - Collection은 생성 즉시 자동 발행되며 MVP에서는 비공개 전환이 없습니다.
-- 다른 사용자에게 실명, 닉네임, 소셜 계정, Context 원문을 공개하지 않습니다.
+- 다른 사용자에게 실명, 소셜 계정 등 사용자 신원 정보와 Context 원문을 공개하지 않습니다.
 - 사용자 소유 데이터는 소프트 삭제하며 사용자 복구 기능은 제공하지 않습니다.
 - Record 수정은 기존 행 수정이 아니라 기존 Record 소프트 삭제 후 새 Record 생성 방식입니다.
 
-## 5. MVP 기술 범위
-
-- Frontend: React, TypeScript, Tailwind CSS, Vite
-- Backend: Java 21, Spring Boot 3.x, Spring Security
-- Database: PostgreSQL, pgvector, PostGIS, Redis
-- AI 후보 구성: Python, FastAPI, LLM API
-- Infrastructure: AWS EC2, Docker, Nginx, Git CI/CD, k3s, ArgoCD
-- Monitoring: Prometheus, Grafana, Loki
 
 세부 정책은 `02_정책_정의서.md`, 구현 제약은 `07_데이터모델_및_무결성.md`를 기준으로 확인합니다.
