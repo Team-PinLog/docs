@@ -2,7 +2,7 @@
 
 DBMS는 PostgreSQL이며, 스키마는 `core`(백엔드 소유)와 `ai`(AI 파트 소유)로 분리합니다. 동일 인스턴스이므로 크로스 스키마 조인이 가능합니다.
 
-Core 테이블의 상세 정의와 근거는 [데이터 모델 및 무결성](06_데이터모델_및_무결성.md)을, `ai` 스키마의 의미와 상태 계약은 [AI 설계](../static/05_AI_설계.md)를 따릅니다.
+Core 테이블의 상세 정의와 근거는 [데이터 모델 및 무결성](06_데이터모델_및_무결성.md)을, `ai` 스키마의 의미와 상태 계약은 [AI 설계](05_AI_설계.md)를 따릅니다.
 
 ## 1. core 스키마
 
@@ -98,7 +98,7 @@ erDiagram
 
 ## 2. ai 스키마
 
-AI 파트 소유입니다. 상세 의미와 상태 계약은 [AI 설계](../static/05_AI_설계.md)를 따릅니다.
+AI 파트 소유입니다. 상세 의미와 상태 계약은 [AI 설계](05_AI_설계.md)를 따릅니다.
 
 백엔드는 `context_keyword`와 `keyword_preset`을 읽기 조인하며, 쓰기는 `context_ai_state`의 PENDING·CANCELLED 전이와 `context_embedding.is_deleted`로 한정합니다. AI 워커는 `core` 스키마에 접근하지 않습니다.
 

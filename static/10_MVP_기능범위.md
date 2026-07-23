@@ -28,7 +28,7 @@
 
 ### Keyword와 AI 자연어 검색
 
-세부 설계는 [AI 설계](../static/05_AI_설계.md)를 따릅니다.
+세부 설계는 [AI 설계](05_AI_설계.md)를 따릅니다.
 
 - Spring과 FastAPI 분리
 - Context 단위 비동기 AI 처리
