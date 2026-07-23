@@ -29,6 +29,7 @@ erDiagram
         bigint member_id FK
         varchar provider "GOOGLE/KAKAO/NAVER"
         varchar provider_user_id "탈퇴 시 마스킹"
+        varchar email "설정 표시용, 탈퇴 시 마스킹, nullable"
         timestamptz created_at
         timestamptz deleted_at
     }
@@ -37,7 +38,8 @@ erDiagram
         bigint id PK
         varchar kakao_place_id UK "식별 기준"
         varchar name
-        varchar address "도로명 우선, 없으면 지번"
+        varchar address "지번 주소, 동 포함"
+        varchar road_address "도로명, nullable"
         varchar phone "nullable"
         varchar place_url "nullable"
         decimal lat "카카오 y"
@@ -212,9 +214,9 @@ Keyword는 Context 단위로만 저장합니다. Record 단위로 저장하면 C
 
 DB 제약으로 표현할 수 없어 서비스 트랜잭션과 행 잠금으로 보장합니다.
 
-- 활성 Record는 활성 Context를 1개 이상 가집니다. 마지막 Context 삭제 요청은 Record 삭제로 승격합니다.
-- 활성 Collection은 활성 Record를 1개 이상 가집니다. 마지막 연결 제거 요청은 Collection 삭제로 승격합니다.
-- Record 삭제 시, 해당 Record가 마지막이던 Collection은 자동 삭제합니다.
+- 활성 Record는 활성 Context를 1개 이상 가집니다. 마지막 Context 삭제 요청은 409로 거절하고, 프론트 확인 후 Record 강제 삭제로 처리합니다.
+- 활성 Collection은 활성 Record를 1개 이상 가집니다. 마지막 연결 제거 요청은 409로 거절하고, 프론트 확인 후 Collection 삭제로 처리합니다.
+- Record 일반 삭제 시 마지막 Record인 Collection이 있으면 409로 거절합니다. 강제 삭제(`/records/{recordId}/force`)에서만 해당 Collection을 함께 삭제합니다.
 - Context 수정은 추가를 먼저 하고 삭제를 나중에 수행하여 빈 Record 상태를 만들지 않습니다.
 - `collection.record_count`는 연결 추가·제거와 동일 트랜잭션에서 갱신합니다.
 
