@@ -2,7 +2,8 @@
 
 MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성 문서를, 화면 흐름은 유저플로우 문서를 따릅니다.
 
-- 기본 경로: `/api/core/v1`
+- 기본 경로: `/api/core/`
+- 응답 형식: 공통 봉투(`success`/`data`/`error`) — 1.6
 - 페이지네이션: 커서 기반
 - 시간 형식: ISO 8601 UTC
 - 삭제 정책: 소프트 삭제
@@ -38,7 +39,10 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 
 ```json
 {
-  "keywords": []
+  "success": true,
+  "data": {
+    "keywords": []
+  }
 }
 ```
 
@@ -50,11 +54,16 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 
 ```json
 {
-  "items": [],
-  "nextCursor": "opaque-cursor-or-null",
-  "hasNext": true
+  "success": true,
+  "data": {
+    "items": [],
+    "nextCursor": "opaque-cursor-or-null",
+    "hasNext": true
+  }
 }
 ```
+
+목록 응답도 공통 봉투(1.6)를 따르며, `items`·`nextCursor`·`hasNext`는 `data` 안에 담긴다.
 
 커서는 불투명 문자열이며 클라이언트가 내부 값을 해석하거나 수정하지 않는다.
 
@@ -65,11 +74,20 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 
 ```json
 {
-  "code": "RESOURCE_NOT_FOUND",
-  "message": "요청한 리소스를 찾을 수 없습니다.",
-  "fieldErrors": []
+  "success": false,
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "요청한 리소스를 찾을 수 없습니다.",
+    "fieldErrors": [],
+    "traceId": "3f1c9a7e-58b2-4d6a-9f0e-7c2b1d4e8a55"
+  }
 }
 ```
+
+- `code`는 클라이언트가 분기하는 안정적인 문자열이다. `message`는 사람이 읽는 설명이며 분기 기준으로 쓰지 않는다.
+- `fieldErrors`는 입력 검증 실패 시 필드별 위반을 담고, 그 외에는 빈 배열이다.
+- `traceId`는 요청 하나를 서버 로그와 잇는 추적 식별자다. 문의·장애 대응 시 이 값으로 해당 요청의 로그를 찾는다. 클라이언트는 해석하지 않고 그대로 노출·전달만 한다.
+- 일부 `code`는 `error` 안에 **추가 필드**를 더한다. 예: `DELETE_CONFIRMATION_REQUIRED`는 연쇄 삭제 영향을 `error.impact`로 반환한다(5.6·5.7).
 
 권장 상태 코드:
 
@@ -83,6 +101,25 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 | `404` | 리소스 없음 또는 접근 권한 없음 |
 | `409` | 상태 충돌 (연쇄 삭제 확인 필요 등) |
 | `422` | 도메인 규칙 위반 |
+
+## 1.6 공통 응답 형식
+
+성공과 오류 모두 같은 봉투로 감싼다. 클라이언트는 `success` 하나로 분기한다.
+
+```json
+// 성공
+{ "success": true, "data": { } }
+
+// 오류
+{ "success": false, "error": { "code": "…", "message": "…", "fieldErrors": [], "traceId": "…" } }
+```
+
+- 성공 응답의 실제 페이로드는 항상 `data` 안에 있다. 목록도 마찬가지다(1.4).
+- 성공 응답에는 `message` 필드를 두지 않는다. 사람이 읽을 문구가 필요하면 `data` 안의 도메인 필드로 표현한다.
+- `null`인 필드는 직렬화에서 생략한다. 성공 응답에 `error` 키가, 오류 응답에 `data` 키가 나타나지 않는다.
+- **`204 No Content`는 본문이 없다.** 봉투도 보내지 않는다.
+- `success`는 HTTP 상태 코드를 대체하지 않는다. 상태 코드의 의미는 위 표를 그대로 따르며, `success: false`는 항상 4xx·5xx와 함께 온다.
+- 아래 3장 이후의 모든 응답 예시는 이 봉투를 적용한 형태다.
 
 ---
 
@@ -199,13 +236,13 @@ GET /api/core/v1/auth/{provider}/callback?code={code}&state={state}
 기존 회원 (활성 `social_account` 존재):
 
 ```json
-{ "status": "LOGIN", "memberId": 1201, "accessToken": "…", "refreshToken": "…" }
+{ "success": true, "data": { "status": "LOGIN", "memberId": 1201, "accessToken": "…", "refreshToken": "…" } }
 ```
 
 신규 (가입 미완료):
 
 ```json
-{ "status": "SIGNUP_REQUIRED", "signupToken": "…" }
+{ "success": true, "data": { "status": "SIGNUP_REQUIRED", "signupToken": "…" } }
 ```
 
 - 신규는 이 시점에 `member`를 생성하지 않는다. 약관 동의 화면으로 유도할 **가입 토큰**(단기, 예: 10분)만 발급한다.
@@ -228,7 +265,7 @@ Authorization: Bearer {signupToken}
 - 동작: `member` + `social_account` 생성(가입 확정) 후 토큰 발급.
 
 ```json
-{ "memberId": 1201, "accessToken": "…", "refreshToken": "…" }
+{ "success": true, "data": { "memberId": 1201, "accessToken": "…", "refreshToken": "…" } }
 ```
 
 201.
@@ -243,7 +280,7 @@ POST /api/core/v1/auth/refresh
 { "refreshToken": "…" }
 ```
 
-- 200: `{ "accessToken": "…", "refreshToken": "…" }` (Refresh도 회전 발급)
+- 200: `{ "success": true, "data": { "accessToken": "…", "refreshToken": "…" } }` (Refresh도 회전 발급)
 - 만료·무효 Refresh: 401 → 프론트는 재로그인으로 유도.
 
 ## 3.5 로그아웃
@@ -265,12 +302,15 @@ GET /api/core/v1/me/summary
 
 ```json
 {
-  "provider": "KAKAO",
-  "email": "user@example.com",
-  "recordCount": 20,
-  "collectionCount": 9,
-  "followerCount": 12,
-  "followingCount": 8
+  "success": true,
+  "data": {
+    "provider": "KAKAO",
+    "email": "user@example.com",
+    "recordCount": 20,
+    "collectionCount": 9,
+    "followerCount": 12,
+    "followingCount": 8
+  }
 }
 ```
 
@@ -311,10 +351,13 @@ Query:
 
 ```json
 {
-  "bounds": { "swLat": 37.4979, "swLng": 126.9270, "neLat": 37.5665, "neLng": 127.0557 },
-  "items": [
-    { "recordId": 8801, "placeId": 5501, "name": "앤트러사이트 성수", "lat": 37.5447, "lng": 127.0557 }
-  ]
+  "success": true,
+  "data": {
+    "bounds": { "swLat": 37.4979, "swLng": 126.9270, "neLat": 37.5665, "neLng": 127.0557 },
+    "items": [
+      { "recordId": 8801, "placeId": 5501, "name": "앤트러사이트 성수", "lat": 37.5447, "lng": 127.0557 }
+    ]
+  }
 }
 ```
 
@@ -368,24 +411,27 @@ POST /api/core/v1/records
 
 ```json
 {
-  "result": "RECORD_CREATED",
-  "recordId": 8801,
-  "place": {
-    "placeId": 5501,
-    "name": "앤트러사이트 성수",
-    "address": "성동구 성수동2가 273-1",
-    "lat": 37.5447,
-    "lng": 127.0557
-  },
-  "contexts": [
-    {
-      "contextId": 91001,
-      "body": "비 오는 날 친구와 가려고 저장",
-      "createdAt": "2026-07-23T10:00:00Z"
-    }
-  ],
-  "keywords": [],
-  "createdAt": "2026-07-23T10:00:00Z"
+  "success": true,
+  "data": {
+    "result": "RECORD_CREATED",
+    "recordId": 8801,
+    "place": {
+      "placeId": 5501,
+      "name": "앤트러사이트 성수",
+      "address": "성동구 성수동2가 273-1",
+      "lat": 37.5447,
+      "lng": 127.0557
+    },
+    "contexts": [
+      {
+        "contextId": 91001,
+        "body": "비 오는 날 친구와 가려고 저장",
+        "createdAt": "2026-07-23T10:00:00Z"
+      }
+    ],
+    "keywords": [],
+    "createdAt": "2026-07-23T10:00:00Z"
+  }
 }
 ```
 
@@ -408,16 +454,19 @@ GET /api/core/v1/records/by-place?kakaoPlaceId=1234567
 프론트가 카카오 장소 상세 화면에서 이 장소에 내 기록이 이미 있는지 확인할 때 사용한다.
 
 ```json
-{ "record": null }
+{ "success": true, "data": { "record": null } }
 ```
 
 ```json
 {
-  "record": {
-    "recordId": 8801,
-    "place": { },
-    "contexts": [ ],
-    "keywords": []
+  "success": true,
+  "data": {
+    "record": {
+      "recordId": 8801,
+      "place": { },
+      "contexts": [ ],
+      "keywords": []
+    }
   }
 }
 ```
@@ -443,10 +492,13 @@ POST /api/core/v1/records/{recordId}/contexts
 
 ```json
 {
-  "contextId": 91003,
-  "body": "실제로 방문했고 창가 자리가 좋았음",
-  "createdAt": "2026-07-23T10:10:00Z",
-  "keywords": []
+  "success": true,
+  "data": {
+    "contextId": 91003,
+    "body": "실제로 방문했고 창가 자리가 좋았음",
+    "createdAt": "2026-07-23T10:10:00Z",
+    "keywords": []
+  }
 }
 ```
 
@@ -468,10 +520,13 @@ Context 수정은 내부적으로 기존 Context를 소프트 삭제하고 새 C
 
 ```json
 {
-  "contextId": 91002,
-  "body": "주말 오후에 다시 가고 싶은 카페",
-  "createdAt": "2026-07-23T10:05:00Z",
-  "keywords": []
+  "success": true,
+  "data": {
+    "contextId": 91002,
+    "body": "주말 오후에 다시 가고 싶은 카페",
+    "createdAt": "2026-07-23T10:05:00Z",
+    "keywords": []
+  }
 }
 ```
 
@@ -492,16 +547,21 @@ DELETE /api/core/v1/records/{recordId}/contexts/{contextId}
 
 ```json
 {
-  "code": "DELETE_CONFIRMATION_REQUIRED",
-  "message": "마지막 Context를 삭제하면 Record와 일부 Collection이 함께 삭제됩니다.",
-  "impact": {
-    "recordDeleted": true,
-    "collectionIds": [7001]
+  "success": false,
+  "error": {
+    "code": "DELETE_CONFIRMATION_REQUIRED",
+    "message": "마지막 Context를 삭제하면 Record와 일부 Collection이 함께 삭제됩니다.",
+    "fieldErrors": [],
+    "traceId": "3f1c9a7e-58b2-4d6a-9f0e-7c2b1d4e8a55",
+    "impact": {
+      "recordDeleted": true,
+      "collectionIds": [7001]
+    }
   }
 }
 ```
 
-프론트는 `impact`를 기반으로 사용자에게 안내한 뒤, 확인을 받으면 `DELETE /records/{recordId}/force`(5.8)를 호출한다.
+프론트는 `error.impact`를 기반으로 사용자에게 안내한 뒤, 확인을 받으면 `DELETE /records/{recordId}/force`(5.8)를 호출한다.
 
 ## 5.7 Record 삭제
 
@@ -519,11 +579,16 @@ DELETE /api/core/v1/records/{recordId}
 
 ```json
 {
-  "code": "DELETE_CONFIRMATION_REQUIRED",
-  "message": "이 기록을 삭제하면 일부 컬렉션이 함께 삭제됩니다.",
-  "impact": {
-    "recordDeleted": true,
-    "collectionIds": [7001, 7002]
+  "success": false,
+  "error": {
+    "code": "DELETE_CONFIRMATION_REQUIRED",
+    "message": "이 기록을 삭제하면 일부 컬렉션이 함께 삭제됩니다.",
+    "fieldErrors": [],
+    "traceId": "3f1c9a7e-58b2-4d6a-9f0e-7c2b1d4e8a55",
+    "impact": {
+      "recordDeleted": true,
+      "collectionIds": [7001, 7002]
+    }
   }
 }
 ```
@@ -568,27 +633,30 @@ POST /api/core/v1/search/records
 
 ```json
 {
-  "bounds": { "swLat": 37.4979, "swLng": 126.9270, "neLat": 37.5665, "neLng": 127.0557 },
-  "items": [
-    {
-      "recordId": 8801,
-      "similarity": 0.82,
-      "place": {
-        "placeId": 5501,
-        "name": "앤트러사이트 성수",
-        "address": "성동구 연무장길 47",
-        "lat": 37.5447,
-        "lng": 127.0557
-      },
-      "matchedContext": {
-        "contextId": 91001,
-        "body": "비 오는 날 친구와 가려고 저장",
-        "createdAt": "2026-07-23T10:00:00Z"
-      },
-      "keywords": ["친구", "비 오는 날", "카페"],
-      "createdAt": "2026-07-20T09:00:00Z"
-    }
-  ]
+  "success": true,
+  "data": {
+    "bounds": { "swLat": 37.4979, "swLng": 126.9270, "neLat": 37.5665, "neLng": 127.0557 },
+    "items": [
+      {
+        "recordId": 8801,
+        "similarity": 0.82,
+        "place": {
+          "placeId": 5501,
+          "name": "앤트러사이트 성수",
+          "address": "성동구 연무장길 47",
+          "lat": 37.5447,
+          "lng": 127.0557
+        },
+        "matchedContext": {
+          "contextId": 91001,
+          "body": "비 오는 날 친구와 가려고 저장",
+          "createdAt": "2026-07-23T10:00:00Z"
+        },
+        "keywords": ["친구", "비 오는 날", "카페"],
+        "createdAt": "2026-07-20T09:00:00Z"
+      }
+    ]
+  }
 }
 ```
 
@@ -640,11 +708,14 @@ POST /api/core/v1/collections
 
 ```json
 {
-  "collectionId": 7050,
-  "title": "비 오는 날의 카페",
-  "recordCount": 3,
-  "publishedAt": "2026-07-23T10:00:00Z",
-  "createdAt": "2026-07-23T10:00:00Z"
+  "success": true,
+  "data": {
+    "collectionId": 7050,
+    "title": "비 오는 날의 카페",
+    "recordCount": 3,
+    "publishedAt": "2026-07-23T10:00:00Z",
+    "createdAt": "2026-07-23T10:00:00Z"
+  }
 }
 ```
 
@@ -681,33 +752,36 @@ collection_records.created_at DESC
 
 ```json
 {
-  "collectionId": 7050,
-  "title": "비 오는 날의 카페",
-  "ownedByMe": true,
-  "follow": null,
-  "records": {
-    "items": [
-      {
-        "recordId": 8801,
-        "place": {},
-        "contexts": [
-          {
-            "contextId": 91001,
-            "body": "비 오는 날 친구와 가려고 저장",
-            "createdAt": "2026-07-23T10:00:00Z"
-          }
-        ],
-        "keywords": [],
-        "createdAt": "2026-07-20T09:00:00Z",
-        "addedToCollectionAt": "2026-07-23T11:00:00Z"
-      }
-    ],
-    "nextCursor": null,
-    "hasNext": false
-  },
-  "publishedAt": "2026-07-23T10:00:00Z",
-  "createdAt": "2026-07-23T10:00:00Z",
-  "updatedAt": "2026-07-23T10:00:00Z"
+  "success": true,
+  "data": {
+    "collectionId": 7050,
+    "title": "비 오는 날의 카페",
+    "ownedByMe": true,
+    "follow": null,
+    "records": {
+      "items": [
+        {
+          "recordId": 8801,
+          "place": {},
+          "contexts": [
+            {
+              "contextId": 91001,
+              "body": "비 오는 날 친구와 가려고 저장",
+              "createdAt": "2026-07-23T10:00:00Z"
+            }
+          ],
+          "keywords": [],
+          "createdAt": "2026-07-20T09:00:00Z",
+          "addedToCollectionAt": "2026-07-23T11:00:00Z"
+        }
+      ],
+      "nextCursor": null,
+      "hasNext": false
+    },
+    "publishedAt": "2026-07-23T10:00:00Z",
+    "createdAt": "2026-07-23T10:00:00Z",
+    "updatedAt": "2026-07-23T10:00:00Z"
+  }
 }
 ```
 
@@ -717,31 +791,34 @@ collection_records.created_at DESC
 
 ```json
 {
-  "collectionId": 7001,
-  "title": "성수 산책 코스",
-  "ownedByMe": false,
-  "follow": {
-    "followed": true,
-    "followId": 701,
-    "alias": "서울 카페"
-  },
-  "records": {
-    "items": [
-      {
-        "recordId": 9901,
-        "place": {},
-        "contexts": null,
-        "keywords": ["산책", "카페"],
-        "createdAt": "2026-07-18T09:00:00Z",
-        "addedToCollectionAt": "2026-07-18T11:00:00Z"
-      }
-    ],
-    "nextCursor": "opaque-record-cursor",
-    "hasNext": true
-  },
-  "publishedAt": "2026-07-18T10:00:00Z",
-  "createdAt": "2026-07-18T10:00:00Z",
-  "updatedAt": "2026-07-20T10:00:00Z"
+  "success": true,
+  "data": {
+    "collectionId": 7001,
+    "title": "성수 산책 코스",
+    "ownedByMe": false,
+    "follow": {
+      "followed": true,
+      "followId": 701,
+      "alias": "서울 카페"
+    },
+    "records": {
+      "items": [
+        {
+          "recordId": 9901,
+          "place": {},
+          "contexts": null,
+          "keywords": ["산책", "카페"],
+          "createdAt": "2026-07-18T09:00:00Z",
+          "addedToCollectionAt": "2026-07-18T11:00:00Z"
+        }
+      ],
+      "nextCursor": "opaque-record-cursor",
+      "hasNext": true
+    },
+    "publishedAt": "2026-07-18T10:00:00Z",
+    "createdAt": "2026-07-18T10:00:00Z",
+    "updatedAt": "2026-07-20T10:00:00Z"
+  }
 }
 ```
 
@@ -808,24 +885,27 @@ GET /api/core/v1/feed/collections/{collectionId}/shelf?cursor={cursor}&size=10
 
 ```json
 {
-  "sourceCollectionId": 7001,
-  "follow": {
-    "followed": false,
-    "followId": null,
-    "alias": null
-  },
-  "collections": {
-    "items": [
-      {
-        "collectionId": 7001,
-        "title": "성수 산책 코스",
-        "recordCount": 5,
-        "keywords": ["산책", "카페"],
-        "createdAt": "2026-07-18T10:00:00Z"
-      }
-    ],
-    "nextCursor": null,
-    "hasNext": false
+  "success": true,
+  "data": {
+    "sourceCollectionId": 7001,
+    "follow": {
+      "followed": false,
+      "followId": null,
+      "alias": null
+    },
+    "collections": {
+      "items": [
+        {
+          "collectionId": 7001,
+          "title": "성수 산책 코스",
+          "recordCount": 5,
+          "keywords": ["산책", "카페"],
+          "createdAt": "2026-07-18T10:00:00Z"
+        }
+      ],
+      "nextCursor": null,
+      "hasNext": false
+    }
   }
 }
 ```
@@ -861,9 +941,12 @@ POST /api/core/v1/follows
 
 ```json
 {
-  "followId": 701,
-  "alias": null,
-  "createdAt": "2026-07-23T10:00:00Z"
+  "success": true,
+  "data": {
+    "followId": 701,
+    "alias": null,
+    "createdAt": "2026-07-23T10:00:00Z"
+  }
 }
 ```
 
@@ -931,12 +1014,15 @@ GET /api/core/v1/follows?cursor={cursor}&size=2
 
 ```json
 {
-  "items": [
-    { "followId": 701, "alias": "서울 카페", "createdAt": "2026-07-23T10:00:00Z" },
-    { "followId": 702, "alias": null, "createdAt": "2026-07-20T10:00:00Z" }
-  ],
-  "nextCursor": "opaque-cursor",
-  "hasNext": true
+  "success": true,
+  "data": {
+    "items": [
+      { "followId": 701, "alias": "서울 카페", "createdAt": "2026-07-23T10:00:00Z" },
+      { "followId": 702, "alias": null, "createdAt": "2026-07-20T10:00:00Z" }
+    ],
+    "nextCursor": "opaque-cursor",
+    "hasNext": true
+  }
 }
 ```
 
@@ -982,19 +1068,22 @@ GET /api/core/v1/feed/collections?cursor={cursor}&size=20
 
 ```json
 {
-  "requestId": "5b2c0000-0000-0000-0000-000000000000",
-  "items": [
-    {
-      "position": 0,
-      "collectionId": 7001,
-      "title": "비 오는 날의 카페",
-      "recordCount": 5,
-      "keywords": ["조용한", "커피"],
-      "createdAt": "2026-07-18T10:00:00Z"
-    }
-  ],
-  "nextCursor": "opaque-feed-cursor",
-  "hasNext": true
+  "success": true,
+  "data": {
+    "requestId": "5b2c0000-0000-0000-0000-000000000000",
+    "items": [
+      {
+        "position": 0,
+        "collectionId": 7001,
+        "title": "비 오는 날의 카페",
+        "recordCount": 5,
+        "keywords": ["조용한", "커피"],
+        "createdAt": "2026-07-18T10:00:00Z"
+      }
+    ],
+    "nextCursor": "opaque-feed-cursor",
+    "hasNext": true
+  }
 }
 ```
 
@@ -1055,6 +1144,43 @@ IMPRESSION은 클라이언트가 보내지 않는다.
 ---
 
 # 11. 주요 DTO
+
+## 11.0 `ApiResponse<T>`
+
+모든 응답의 봉투다(1.6). 아래 DTO들은 항상 `data` 안에 담겨 전달된다.
+
+```typescript
+type ApiResponse<T> =
+  | { success: true; data: T }
+  | { success: false; error: ApiError };
+
+type ApiError = {
+  code: string;
+  message: string;
+  fieldErrors: FieldError[];
+  traceId: string;
+  // 일부 code는 추가 필드를 더한다. 예: DELETE_CONFIRMATION_REQUIRED → impact
+  impact?: { recordDeleted: boolean; collectionIds: number[] };
+};
+
+type FieldError = {
+  field: string;
+  message: string;
+};
+```
+
+조합 예시:
+
+```typescript
+// GET /collections/{collectionId}
+type CollectionDetailResponse = ApiResponse<CollectionDetail>;
+
+// GET /follows
+type FollowListResponse = ApiResponse<CursorPage<FollowSummary>>;
+```
+
+- `success`로 좁히면(`if (res.success)`) `data`와 `error`가 타입 수준에서 배타적으로 갈린다.
+- `204 No Content`는 본문이 없으므로 이 타입으로 파싱하지 않는다.
 
 ## 11.1 `RecordDetail`
 
