@@ -627,7 +627,7 @@ DELETE /api/core/v1/records/{recordId}
 ```
 
 - 프론트는 이 Record가 어떤 Collection의 마지막 Record인지 알 수 없다. 서버가 DB에서 확인한다.
-- 마지막 Record인 활성 Collection이 없으면: Record·Context 소프트 삭제, Collection 연결 소프트 삭제, AI 파생 데이터 파기(204).
+- 마지막 Record인 활성 Collection이 없으면: Record·Context 소프트 삭제, Collection 연결 소프트 삭제, AI 파생 데이터 무효화 — State `CANCELLED` + Embedding `is_deleted`(204). 물리 삭제 시점은 미결이며 별도 개인정보 정책을 따른다([06 §1.1](06_데이터모델_및_무결성.md)).
 - 마지막 Record인 활성 Collection이 있으면: 삭제하지 않고 409로 거절한다.
 
 ```http
@@ -657,7 +657,7 @@ DELETE /api/core/v1/records/{recordId}/force
 ```
 
 - 5.6·5.7에서 409를 받은 프론트가 사용자 안내·확인 후 호출한다.
-- Record·활성 Context 전체 소프트 삭제, Collection 연결 소프트 삭제, **마지막 Record였던 Collection 소프트 삭제**, AI 파생 데이터 파기를 한 트랜잭션으로 수행한다.
+- Record·활성 Context 전체 소프트 삭제, Collection 연결 소프트 삭제, **마지막 Record였던 Collection 소프트 삭제**, AI 파생 데이터 무효화(State `CANCELLED` + Embedding `is_deleted`)를 한 트랜잭션으로 수행한다.
 - 204.
 - 연쇄 삭제 대상이 없어도 정상 수행한다(일반 삭제와 동일 결과).
 
@@ -682,9 +682,8 @@ POST /api/core/v1/search/records
 
 검색 범위:
 
-- 현재 로그인 사용자의 Place
-- 현재 로그인 사용자의 Context
-- 현재 로그인 사용자의 Keyword
+- 현재 로그인 사용자의 **활성 Context 임베딩 단일 경로**다. 질의 전체를 1회 임베딩해 Context 단위 유사도(정확 cosine)를 구하고, Record 단위로 집계한다(최고 유사도 Context가 `matchedContext` 대표).
+- Place·Keyword는 독립 검색 경로가 아니다([AI 설계](05_AI_설계.md) §9.4 MVP 제외 — 독립 Place·Keyword 후보 검색).
 
 응답:
 
@@ -709,7 +708,7 @@ POST /api/core/v1/search/records
           "body": "비 오는 날 친구와 가려고 저장",
           "createdAt": "2026-07-23T10:00:00Z"
         },
-        "keywords": ["친구", "비 오는 날", "카페"],
+        "keywords": ["친구", "비 오는 날"],
         "createdAt": "2026-07-20T09:00:00Z"
       }
     ]
@@ -719,7 +718,7 @@ POST /api/core/v1/search/records
 
 - `bounds`는 검색 결과 Record들의 Place 전체를 포함하는 최소 사각형이다(4.2와 동일 규칙: 결과 없으면 `null`). 프론트는 검색 결과를 지도에 띄울 때 `fitBounds(bounds, padding)`을 사용한다.
 - `keywords`는 매칭된 Context의 Keyword가 아니라 **해당 Record의 활성 Context 전체 Keyword 집계값**이다(`ai.context_keyword`를 Record 단위로 집계, 중복 제거).
-- `keywords`는 `keyword_preset`의 `label` 문자열 배열이다. `code`는 내부 식별용으로 노출하지 않는다(모든 Keyword 응답 공통).
+- `keywords`는 `keyword_preset`의 `display_name` 문자열 배열이다. `code`는 내부 식별용으로 노출하지 않는다(모든 Keyword 응답 공통). 지역·Place 카테고리(예: "카페")는 프리셋에 없으므로 Keyword로 나올 수 없다.
 
 ### 검색 결과 카드 요구사항
 
