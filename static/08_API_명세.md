@@ -367,8 +367,24 @@ DELETE /api/core/v1/me
 | `member`, `social_account` | 소프트 삭제 |
 | `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제 |
 | `social_account`의 `provider_user_id`, `email` | **마스킹**(개인정보 파기 대상) |
+| `ai.context_ai_state` | 두 status를 `CANCELLED`로 전이 |
+| `ai.context_embedding` | `is_deleted = true` 표시 |
 | Refresh Token | 해당 회원의 **모든** Refresh를 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
 | `place` | 공용 데이터이므로 유지한다 |
+
+### AI 파생 데이터
+
+Context가 소프트 삭제될 때 함께 처리한다. **물리 삭제가 아니라 무효화 표시다.**
+
+| 표시 | 효과 |
+|---|---|
+| `context_ai_state`의 두 status → `CANCELLED` | 진행 중인 AI 작업을 취소해 **늦게 도착한 결과가 저장되는 것을 막는다** |
+| `context_embedding.is_deleted = true` | 검색 대상에서 제외하고 물리 삭제 대상으로 식별한다 |
+
+- 두 컬럼 모두 **백엔드(Spring)가 변경한다.** FastAPI는 건드리지 않는다(05 §12.3).
+- `ai.context_keyword`는 별도 처리가 필요 없다. `keyword_status`가 `CANCELLED`가 되면 조회에서 자동으로 제외된다(05 §9).
+- 물리 삭제 시점은 이 명세의 범위가 아니며 개인정보 정책을 따른다(07 §5).
+- 같은 처리를 Record 삭제(5.6·5.7)에도 적용한다. 탈퇴 전용 동작이 아니다.
 
 이 경로는 Refresh 쿠키의 `Path` 범위 밖이라 Refresh 쿠키가 전송되지 않는다. 따라서 **Access 쿠키로 회원을 식별하고 그 회원의 Refresh를 전부 무효화한다.** 탈퇴는 모든 기기에서 즉시 로그아웃되어야 하므로 전체 무효화가 의도된 동작이다. Access가 만료된 상태라면 인증 실패(401)이므로, 클라이언트는 재발급(3.3) 후 다시 요청한다.
 
