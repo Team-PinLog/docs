@@ -500,7 +500,7 @@ POST /api/core/v1/records
 GET /api/core/v1/records/{recordId}
 ```
 
-본인 소유 Record만 조회한다. `contexts`는 배열이다.
+본인 소유 Record만 조회한다. `contexts`는 배열이며, `createdAt`(최초 작성 시각) 오름차순 — 오래된 것부터 — 으로 정렬된다. 모든 `contexts` 배열 응답에 공통이다.
 
 ## 5.3 장소로 내 Record 조회
 
@@ -573,7 +573,7 @@ PATCH /api/core/v1/records/{recordId}/contexts/{contextId}
 
 Context 수정은 내부적으로 기존 Context를 소프트 삭제하고 새 Context를 생성하는 교체 방식으로 처리할 수 있다.
 
-응답은 최신 ID를 반환한다.
+응답은 최신 ID를 반환한다. `createdAt`은 구 Context의 최초 작성 시각을 그대로 승계한다(`origin_created_at`) — 수정해도 목록 위치와 표시 시각이 바뀌지 않는다.
 
 ```json
 {
@@ -581,13 +581,13 @@ Context 수정은 내부적으로 기존 Context를 소프트 삭제하고 새 C
   "data": {
     "contextId": 91002,
     "body": "주말 오후에 다시 가고 싶은 카페",
-    "createdAt": "2026-07-23T10:05:00Z",
+    "createdAt": "2026-07-23T10:00:00Z",
     "keywords": []
   }
 }
 ```
 
-프론트는 기존 `contextId`를 새 ID로 교체해야 한다.
+프론트는 기존 `contextId`를 새 ID로 교체해야 한다. `createdAt`은 바뀌지 않는다.
 
 ## 5.6 Context 삭제
 
@@ -1264,7 +1264,7 @@ type RecordDetail = {
 type ContextDetail = {
   contextId: number;
   body: string;
-  createdAt: string;
+  createdAt: string; // 최초 작성 시각(origin_created_at). 수정으로 contextId가 바뀌어도 승계되어 변하지 않는다
 };
 ```
 

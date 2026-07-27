@@ -62,6 +62,7 @@ erDiagram
         bigint record_id FK
         bigint member_id FK "비정규화: 검색 범위 필터"
         text body "개인정보, 타인 미공개, 불변"
+        timestamptz origin_created_at "최초 작성 시각, 수정 시 승계"
         timestamptz created_at
         timestamptz deleted_at
     }
