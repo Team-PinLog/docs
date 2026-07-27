@@ -20,6 +20,7 @@ PinLog은 장소를 `Context`와 함께 `Record`로 저장하고, 자연어로 �
 | [API 명세](static/08_API_명세.md) | MVP Endpoint 목록 (상세 명세 흡수) |
 | [유저플로우](static/09_유저플로우.md) | 핵심 사용자 흐름 |
 | [MVP 기능범위](static/10_MVP_기능범위.md) | 포함·제외 기능 |
+| [인증 설계](static/11_인증_설계.md) | 인증 방식 결정과 근거, 클라이언트 계약 |
 
 ## 기준
 
