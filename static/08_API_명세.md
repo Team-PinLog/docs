@@ -22,7 +22,7 @@ MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성
 - Refresh Token은 **Redis**에 저장한다(로그아웃 무효화·회전 발급 관리, TTL 자동 만료).
 - 토큰은 **`HttpOnly` + `Secure` + `SameSite=Lax` 쿠키**로 발급한다. 응답 본문에 토큰을 담지 않으며 클라이언트 스크립트는 토큰을 읽을 수 없다.
 - 클라이언트는 요청에 자격증명을 포함시키기만 한다(`credentials: include` / `withCredentials`). 인증 헤더를 직접 구성하지 않는다.
-- Refresh 쿠키는 `Path`를 재발급 경로로 제한해 일반 요청에 실리지 않게 한다.
+- Refresh 쿠키는 `Path=/api/core/v1/auth`로 제한해 일반 API 요청(`/records` 등)에 실리지 않게 한다. 재발급과 로그아웃이 모두 이 범위에 들어간다.
 - 프론트엔드와 API는 같은 오리진에서 서비스한다. 따라서 `SameSite=None`과 CORS 자격증명 설정이 필요하지 않다.
 - 인증 쿠키와 별개로, 클라이언트가 로그인 여부를 판단할 수 있도록 **표시용 쿠키**를 함께 발급한다(1.8).
 - Access 만료(401) 시 `POST /auth/refresh`로 재발급한다.
@@ -280,12 +280,12 @@ GET /api/core/v1/auth/{provider}/callback?code={code}&state={state}
 ```http
 HTTP/1.1 302 Found
 Location: /auth/callback
-Set-Cookie: accessToken=…; Path=/api/core/v1
-Set-Cookie: refreshToken=…; Path=/api/core/v1/auth/refresh
-Set-Cookie: logged_in=1; Path=/
+Set-Cookie: accessToken=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core/v1
+Set-Cookie: refreshToken=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core/v1/auth
+Set-Cookie: logged_in=1; Secure; SameSite=Lax; Path=/
 ```
 
-인증 쿠키 속성은 1.1, 표시 쿠키는 1.8을 따른다.
+`logged_in`만 `HttpOnly`가 아니다(1.8). 나머지 속성 근거는 1.1에 있다.
 
 복귀 경로는 성공·실패 모두 `/auth/callback` 하나이며, 실패 시에만 `error` query가 붙는다.
 
@@ -305,7 +305,7 @@ POST /api/core/v1/auth/refresh
 
 요청 본문이 없다. Refresh 쿠키로 식별한다.
 
-- 200: 새 Access·Refresh 쿠키를 `Set-Cookie`로 발급하고 표시 쿠키(1.8)의 만료를 함께 갱신한다(Refresh도 회전 발급). 본문이 없으므로 봉투(1.6)가 적용되지 않는다.
+- **204**: 새 Access·Refresh 쿠키를 `Set-Cookie`로 발급하고 표시 쿠키(1.8)의 만료를 함께 갱신한다(Refresh도 회전 발급). 본문이 없으므로 봉투(1.6)가 적용되지 않는다.
 - 만료·무효, 또는 회전 전 Refresh 재사용: 401. 오류 응답은 봉투를 따른다(1.5). 클라이언트는 재로그인으로 유도한다.
 
 회전 발급이므로 재발급 요청은 **동시에 하나만** 보낸다. 401이 여러 건 동시에 발생해도 재발급은 한 번만 호출하고 나머지 요청은 그 결과를 기다린다.
@@ -318,6 +318,12 @@ POST /api/core/v1/auth/logout
 
 - 동작: Refresh Token을 무효화하고 Access·Refresh 쿠키와 표시 쿠키(1.8)를 모두 만료시킨다.
 - 204.
+
+무효화 대상은 **Refresh 쿠키로 식별한다.** 이 경로는 Refresh 쿠키의 `Path` 범위(`/api/core/v1/auth`) 안에 있으므로 쿠키가 함께 전송된다.
+
+- Access가 이미 만료됐어도 로그아웃은 동작한다. Refresh 쿠키만으로 대상을 특정할 수 있기 때문이다.
+- 해당 세션 하나만 무효화한다. 다른 기기의 로그인은 유지된다.
+- Refresh 쿠키가 없거나 이미 무효한 경우에도 **204**를 반환한다. 서버에 지울 것이 없을 뿐이고, 쿠키 정리는 그대로 수행한다. 이미 로그아웃된 상태를 오류로 취급하지 않는다.
 
 ## 3.5 마이페이지 요약
 
@@ -361,8 +367,10 @@ DELETE /api/core/v1/me
 | `member`, `social_account` | 소프트 삭제 |
 | `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제 |
 | `social_account`의 `provider_user_id`, `email` | **마스킹**(개인정보 파기 대상) |
-| Refresh Token | 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
+| Refresh Token | 해당 회원의 **모든** Refresh를 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
 | `place` | 공용 데이터이므로 유지한다 |
+
+이 경로는 Refresh 쿠키의 `Path` 범위 밖이라 Refresh 쿠키가 전송되지 않는다. 따라서 **Access 쿠키로 회원을 식별하고 그 회원의 Refresh를 전부 무효화한다.** 탈퇴는 모든 기기에서 즉시 로그아웃되어야 하므로 전체 무효화가 의도된 동작이다. Access가 만료된 상태라면 인증 실패(401)이므로, 클라이언트는 재발급(3.3) 후 다시 요청한다.
 
 - 탈퇴한 사용자의 Shelf와 Collection은 다른 사용자의 Library·Feed에서 즉시 제외한다.
 - 활성 `social_account`가 사라지므로, 같은 소셜 계정으로 다시 로그인하면 **신규 회원으로 가입**된다(3.2). 과거 데이터는 복구되지 않는다.
