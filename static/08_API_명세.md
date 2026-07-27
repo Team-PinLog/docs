@@ -5,6 +5,7 @@ MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성
 - 서비스 context-path: `/api/core` (인프라 고정값. 컨트롤러 매핑에 다시 쓰지 않는다)
 - API 버전: `v1` — context-path 뒤에 붙는 버전 세그먼트
 - **기본 경로: `/api/core/v1`** (위 둘을 합친 값. 2장 목록의 Endpoint는 여기에 이어 붙는 상대 경로다)
+  - 클라이언트의 API base URL 환경변수에는 이 값을 넣는다. 3장 이후 모든 예시가 이 경로로 시작한다
 - 응답 형식: 공통 봉투(`success`/`data`/`error`) — 1.6
 - 페이지네이션: 커서 기반
 - 시간 형식: ISO 8601 UTC
@@ -23,6 +24,7 @@ MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성
 - 클라이언트는 요청에 자격증명을 포함시키기만 한다(`credentials: include` / `withCredentials`). 인증 헤더를 직접 구성하지 않는다.
 - Refresh 쿠키는 `Path`를 재발급 경로로 제한해 일반 요청에 실리지 않게 한다.
 - 프론트엔드와 API는 같은 오리진에서 서비스한다. 따라서 `SameSite=None`과 CORS 자격증명 설정이 필요하지 않다.
+- 인증 쿠키와 별개로, 클라이언트가 로그인 여부를 판단할 수 있도록 **표시용 쿠키**를 함께 발급한다(1.8).
 - Access 만료(401) 시 `POST /auth/refresh`로 재발급한다.
 - 개인 API에서 사용자 ID를 요청 Query나 Body로 받지 않는다. 서버가 쿠키로 식별한다.
 - 내부 사용자 ID는 응답에 포함하지 않는다. 클라이언트는 자신의 `memberId`를 알 필요가 없다.
@@ -136,6 +138,24 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 - 헤더가 없거나 값이 일치하지 않으면 `403`을 반환한다.
 - `GET`을 비롯한 조회 요청은 해당하지 않는다.
 
+## 1.8 로그인 표시 쿠키
+
+인증 쿠키는 `HttpOnly`라 클라이언트가 읽을 수 없다. 앱 시작 시 로그인 화면을 띄울지 판단할 수 있도록, 값에 의미가 없는 표시용 쿠키를 함께 발급한다.
+
+| 항목 | 값 |
+|---|---|
+| 이름·값 | `logged_in=1` |
+| 속성 | `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age`는 Refresh와 동일(7일). **`HttpOnly`가 아니다** |
+| 내용 | 개인정보·식별자를 담지 않는다. 존재 여부만 의미가 있다 |
+| 발급·갱신 | 로그인 콜백(3.2), 재발급 성공(3.3) |
+| 삭제 | 로그아웃(3.4), 회원 탈퇴(3.6) |
+
+> **UI 힌트 전용이다. 인가 판단에 사용하지 않는다.**
+>
+> 실제 인가는 서버가 **매 요청** 인증 쿠키를 검증해 수행한다. 이 쿠키는 브라우저에 남아 있어도 세션이 이미 무효일 수 있다(예: Refresh 만료, 다른 기기에서 로그아웃). 그 경우 첫 API 호출이 `401`을 반환하므로, 클라이언트는 재발급(3.3)을 시도하고 실패하면 로그인 화면으로 유도한다.
+>
+> 이 쿠키의 존재를 근거로 보호 화면을 렌더링하는 것은 무방하다. 이 쿠키의 존재를 근거로 **권한이 있다고 판단하는 것은 안 된다.**
+
 ---
 
 # 2. Endpoint 전체 목록
@@ -150,7 +170,6 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 | GET | `/auth/{provider}/callback` | 소셜 로그인 콜백 (신규면 가입 처리 후 인증 쿠키 발급) |
 | POST | `/auth/refresh` | Access Token 재발급 |
 | POST | `/auth/logout` | 로그아웃 (Refresh Token 무효화) |
-| GET | `/auth/session` | 로그인 여부 확인 (앱 시작 시 1회) |
 | GET | `/me/summary` | 마이페이지 요약 (계정 정보 + Record·Collection·팔로워·팔로잉 수) |
 | DELETE | `/me` | 회원 탈퇴 |
 
@@ -263,9 +282,10 @@ HTTP/1.1 302 Found
 Location: /auth/callback
 Set-Cookie: accessToken=…; Path=/api/core/v1
 Set-Cookie: refreshToken=…; Path=/api/core/v1/auth/refresh
+Set-Cookie: logged_in=1; Path=/
 ```
 
-쿠키 속성은 1.1을 따른다.
+인증 쿠키 속성은 1.1, 표시 쿠키는 1.8을 따른다.
 
 복귀 경로는 성공·실패 모두 `/auth/callback` 하나이며, 실패 시에만 `error` query가 붙는다.
 
@@ -285,7 +305,7 @@ POST /api/core/v1/auth/refresh
 
 요청 본문이 없다. Refresh 쿠키로 식별한다.
 
-- 200: 새 Access·Refresh 쿠키를 `Set-Cookie`로 발급한다(Refresh도 회전 발급). 본문이 없으므로 봉투(1.6)가 적용되지 않는다.
+- 200: 새 Access·Refresh 쿠키를 `Set-Cookie`로 발급하고 표시 쿠키(1.8)의 만료를 함께 갱신한다(Refresh도 회전 발급). 본문이 없으므로 봉투(1.6)가 적용되지 않는다.
 - 만료·무효, 또는 회전 전 Refresh 재사용: 401. 오류 응답은 봉투를 따른다(1.5). 클라이언트는 재로그인으로 유도한다.
 
 회전 발급이므로 재발급 요청은 **동시에 하나만** 보낸다. 401이 여러 건 동시에 발생해도 재발급은 한 번만 호출하고 나머지 요청은 그 결과를 기다린다.
@@ -296,32 +316,10 @@ POST /api/core/v1/auth/refresh
 POST /api/core/v1/auth/logout
 ```
 
-- 동작: Refresh Token을 무효화하고 Access·Refresh 쿠키를 만료시킨다.
+- 동작: Refresh Token을 무효화하고 Access·Refresh 쿠키와 표시 쿠키(1.8)를 모두 만료시킨다.
 - 204.
 
-## 3.5 세션 확인
-
-```http
-GET /api/core/v1/auth/session
-```
-
-앱 시작 시 로그인 여부를 판단하기 위해 1회 호출한다. 인증 쿠키는 `HttpOnly`라 클라이언트가 직접 읽을 수 없으므로 이 Endpoint가 유일한 판단 근거다.
-
-- 200: 로그인 상태다.
-
-```json
-{
-  "success": true,
-  "data": {
-    "authenticated": true
-  }
-}
-```
-
-- 401: 로그인 상태가 아니다. 보호 Endpoint이므로 Access가 만료됐으면 평소와 같이 재발급(3.3)을 시도하고, 그것도 실패하면 로그인 화면으로 유도한다.
-- 집계나 조인이 없는 가벼운 호출이다. 로그인 판단에 `GET /me/summary`(3.6)를 사용하지 않는다.
-
-## 3.6 마이페이지 요약
+## 3.5 마이페이지 요약
 
 ```http
 GET /api/core/v1/me/summary
@@ -347,7 +345,7 @@ GET /api/core/v1/me/summary
 - 팔로워·팔로잉 목록은 제공하지 않는다. 수치는 본인만 볼 수 있다.
 - `memberId`는 반환하지 않는다. 개인 API는 서버가 쿠키로 사용자를 식별하므로 클라이언트가 자신의 내부 ID를 알 필요가 없다(1.1).
 
-## 3.7 회원 탈퇴
+## 3.6 회원 탈퇴
 
 ```http
 DELETE /api/core/v1/me
@@ -363,7 +361,7 @@ DELETE /api/core/v1/me
 | `member`, `social_account` | 소프트 삭제 |
 | `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제 |
 | `social_account`의 `provider_user_id`, `email` | **마스킹**(개인정보 파기 대상) |
-| Refresh Token | 무효화하고 인증 쿠키를 만료시킨다 |
+| Refresh Token | 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
 | `place` | 공용 데이터이므로 유지한다 |
 
 - 탈퇴한 사용자의 Shelf와 Collection은 다른 사용자의 Library·Feed에서 즉시 제외한다.
