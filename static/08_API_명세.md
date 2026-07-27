@@ -17,9 +17,10 @@ MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성
 - 방식: **JWT (확정)**. Access Token + Refresh Token.
 - 만료: Access **30분**, Refresh **7일**.
 - Refresh Token은 **Redis**에 저장한다(로그아웃 무효화·회전 발급 관리, TTL 자동 만료).
-- 토큰은 **`HttpOnly` + `Secure` + `SameSite` 쿠키**로 발급한다. 응답 본문에 토큰을 담지 않으며 클라이언트 스크립트는 토큰을 읽을 수 없다.
+- 토큰은 **`HttpOnly` + `Secure` + `SameSite=Lax` 쿠키**로 발급한다. 응답 본문에 토큰을 담지 않으며 클라이언트 스크립트는 토큰을 읽을 수 없다.
 - 클라이언트는 요청에 자격증명을 포함시키기만 한다(`credentials: include` / `withCredentials`). 인증 헤더를 직접 구성하지 않는다.
 - Refresh 쿠키는 `Path`를 재발급 경로로 제한해 일반 요청에 실리지 않게 한다.
+- 프론트엔드와 API는 같은 오리진에서 서비스한다. 따라서 `SameSite=None`과 CORS 자격증명 설정이 필요하지 않다.
 - Access 만료(401) 시 `POST /auth/refresh`로 재발급한다.
 - 개인 API에서 사용자 ID를 요청 Query나 Body로 받지 않는다. 서버가 쿠키로 식별한다.
 - 내부 사용자 ID는 응답에 포함하지 않는다. 클라이언트는 자신의 `memberId`를 알 필요가 없다.
@@ -145,6 +146,7 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 | GET | `/auth/{provider}/callback` | 소셜 로그인 콜백 (신규면 가입 처리 후 인증 쿠키 발급) |
 | POST | `/auth/refresh` | Access Token 재발급 |
 | POST | `/auth/logout` | 로그아웃 (Refresh Token 무효화) |
+| GET | `/auth/session` | 로그인 여부 확인 (앱 시작 시 1회) |
 | GET | `/me/summary` | 마이페이지 요약 (계정 정보 + Record·Collection·팔로워·팔로잉 수) |
 | DELETE | `/me` | 회원 탈퇴 |
 
@@ -254,14 +256,22 @@ GET /api/core/v1/auth/{provider}/callback?code={code}&state={state}
 
 ```http
 HTTP/1.1 302 Found
-Location: {클라이언트 복귀 URL}
+Location: /auth/callback
 Set-Cookie: accessToken=…; Path=/api/core/v1
 Set-Cookie: refreshToken=…; Path=/api/core/v1/auth/refresh
 ```
 
-쿠키 속성은 1.1을 따른다. 복귀 URL은 배포 환경별 설정값이다.
+쿠키 속성은 1.1을 따른다.
 
-공급자 인증에 실패하면 실패를 나타내는 query와 함께 같은 복귀 URL로 리다이렉트한다.
+복귀 경로는 성공·실패 모두 `/auth/callback` 하나이며, 실패 시에만 `error` query가 붙는다.
+
+```text
+성공: /auth/callback
+실패: /auth/callback?error=OAUTH_FAILED
+```
+
+- 복귀 경로는 **서버 설정값**이며 요청 파라미터로 받지 않는다. 임의 URL을 받으면 open redirect 취약점이 된다.
+- 로그인 이전 화면으로 되돌아가는 처리는 클라이언트가 담당한다(로그인 시작 전 경로를 `sessionStorage` 등에 보관).
 
 ## 3.3 토큰 재발급
 
@@ -285,7 +295,29 @@ POST /api/core/v1/auth/logout
 - 동작: Refresh Token을 무효화하고 Access·Refresh 쿠키를 만료시킨다.
 - 204.
 
-## 3.5 마이페이지 요약
+## 3.5 세션 확인
+
+```http
+GET /api/core/v1/auth/session
+```
+
+앱 시작 시 로그인 여부를 판단하기 위해 1회 호출한다. 인증 쿠키는 `HttpOnly`라 클라이언트가 직접 읽을 수 없으므로 이 Endpoint가 유일한 판단 근거다.
+
+- 200: 로그인 상태다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "authenticated": true
+  }
+}
+```
+
+- 401: 로그인 상태가 아니다. 보호 Endpoint이므로 Access가 만료됐으면 평소와 같이 재발급(3.3)을 시도하고, 그것도 실패하면 로그인 화면으로 유도한다.
+- 집계나 조인이 없는 가벼운 호출이다. 로그인 판단에 `GET /me/summary`(3.6)를 사용하지 않는다.
+
+## 3.6 마이페이지 요약
 
 ```http
 GET /api/core/v1/me/summary
@@ -310,6 +342,28 @@ GET /api/core/v1/me/summary
 - 카운트는 모두 활성 데이터 기준 집계다.
 - 팔로워·팔로잉 목록은 제공하지 않는다. 수치는 본인만 볼 수 있다.
 - `memberId`는 반환하지 않는다. 개인 API는 서버가 쿠키로 사용자를 식별하므로 클라이언트가 자신의 내부 ID를 알 필요가 없다(1.1).
+
+## 3.7 회원 탈퇴
+
+```http
+DELETE /api/core/v1/me
+```
+
+- 204. 응답 본문이 없다.
+- 되돌릴 수 없다. 클라이언트는 실행 전 확인 절차를 둔다.
+
+동작은 정책 정의서 10장을 따른다.
+
+| 대상 | 처리 |
+|---|---|
+| `member`, `social_account` | 소프트 삭제 |
+| `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제 |
+| `social_account`의 `provider_user_id`, `email` | **마스킹**(개인정보 파기 대상) |
+| Refresh Token | 무효화하고 인증 쿠키를 만료시킨다 |
+| `place` | 공용 데이터이므로 유지한다 |
+
+- 탈퇴한 사용자의 Shelf와 Collection은 다른 사용자의 Library·Feed에서 즉시 제외한다.
+- 활성 `social_account`가 사라지므로, 같은 소셜 계정으로 다시 로그인하면 **신규 회원으로 가입**된다(3.2). 과거 데이터는 복구되지 않는다.
 
 ---
 
