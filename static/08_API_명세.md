@@ -2,7 +2,9 @@
 
 MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성 문서를, 화면 흐름은 유저플로우 문서를 따릅니다.
 
-- 기본 경로: `/api/core/`
+- 서비스 context-path: `/api/core` (인프라 고정값. 컨트롤러 매핑에 다시 쓰지 않는다)
+- API 버전: `v1` — context-path 뒤에 붙는 버전 세그먼트
+- **기본 경로: `/api/core/v1`** (위 둘을 합친 값. 2장 목록의 Endpoint는 여기에 이어 붙는 상대 경로다)
 - 응답 형식: 공통 봉투(`success`/`data`/`error`) — 1.6
 - 페이지네이션: 커서 기반
 - 시간 형식: ISO 8601 UTC
@@ -137,6 +139,8 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 ---
 
 # 2. Endpoint 전체 목록
+
+아래 표의 Endpoint는 모두 기본 경로 `/api/core/v1` 뒤에 붙는 상대 경로다. 예를 들어 `/auth/logout`의 전체 경로는 `/api/core/v1/auth/logout`이다. 3장 이후의 상세에서는 전체 경로로 표기한다.
 
 ## 2.1 인증·계정
 
