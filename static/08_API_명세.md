@@ -2,7 +2,10 @@
 
 MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성 문서를, 화면 흐름은 유저플로우 문서를 따릅니다.
 
-- 기본 경로: `/api/core/`
+- 서비스 context-path: `/api/core` (인프라 고정값. 컨트롤러 매핑에 다시 쓰지 않는다)
+- API 버전: `v1` — context-path 뒤에 붙는 버전 세그먼트
+- **기본 경로: `/api/core/v1`** (위 둘을 합친 값. 2장 목록의 Endpoint는 여기에 이어 붙는 상대 경로다)
+  - 클라이언트의 API base URL 환경변수에는 이 값을 넣는다. 3장 이후 모든 예시가 이 경로로 시작한다
 - 응답 형식: 공통 봉투(`success`/`data`/`error`) — 1.6
 - 페이지네이션: 커서 기반
 - 시간 형식: ISO 8601 UTC
@@ -17,10 +20,14 @@ MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성
 - 방식: **JWT (확정)**. Access Token + Refresh Token.
 - 만료: Access **30분**, Refresh **7일**.
 - Refresh Token은 **Redis**에 저장한다(로그아웃 무효화·회전 발급 관리, TTL 자동 만료).
-- 보호 Endpoint는 `Authorization: Bearer {accessToken}` 헤더가 필요하다.
+- 토큰은 **`HttpOnly` + `Secure` + `SameSite=Lax` 쿠키**로 발급한다. 응답 본문에 토큰을 담지 않으며 클라이언트 스크립트는 토큰을 읽을 수 없다.
+- 클라이언트는 요청에 자격증명을 포함시키기만 한다(`credentials: include` / `withCredentials`). 인증 헤더를 직접 구성하지 않는다.
+- Refresh 쿠키는 `Path=/api/core/v1/auth`로 제한해 일반 API 요청(`/records` 등)에 실리지 않게 한다. 재발급과 로그아웃이 모두 이 범위에 들어간다.
+- 프론트엔드와 API는 같은 오리진에서 서비스한다. 따라서 `SameSite=None`과 CORS 자격증명 설정이 필요하지 않다.
+- 인증 쿠키와 별개로, 클라이언트가 로그인 여부를 판단할 수 있도록 **표시용 쿠키**를 함께 발급한다(1.8).
 - Access 만료(401) 시 `POST /auth/refresh`로 재발급한다.
-- 개인 API에서 사용자 ID를 요청 Query나 Body로 받지 않는다. 서버가 토큰으로 식별한다.
-- 내부 사용자 ID는 공개 응답에 포함하지 않는다(로그인·가입 응답에서 본인 `memberId`를 받는 것만 예외).
+- 개인 API에서 사용자 ID를 요청 Query나 Body로 받지 않는다. 서버가 쿠키로 식별한다.
+- 내부 사용자 ID는 응답에 포함하지 않는다. 클라이언트는 자신의 `memberId`를 알 필요가 없다.
 
 ## 1.2 권한 실패
 
@@ -98,6 +105,7 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 | `204` | 응답 본문 없는 성공 |
 | `400` | 형식 또는 입력값 오류 |
 | `401` | 인증 필요 |
+| `403` | CSRF 토큰 누락·불일치 (자원 접근 권한 실패는 1.2에 따라 `404`) |
 | `404` | 리소스 없음 또는 접근 권한 없음 |
 | `409` | 상태 충돌 (연쇄 삭제 확인 필요 등) |
 | `422` | 도메인 규칙 위반 |
@@ -121,19 +129,47 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 - `success`는 HTTP 상태 코드를 대체하지 않는다. 상태 코드의 의미는 위 표를 그대로 따르며, `success: false`는 항상 4xx·5xx와 함께 온다.
 - 아래 3장 이후의 모든 응답 예시는 이 봉투를 적용한 형태다.
 
+## 1.7 CSRF
+
+쿠키 기반 인증이므로 상태를 바꾸는 요청은 CSRF 토큰을 요구한다.
+
+- 서버가 `XSRF-TOKEN` 쿠키를 내려준다. 이 쿠키는 **`HttpOnly`가 아니며** 클라이언트가 읽을 수 있다.
+- 클라이언트는 `POST`·`PUT`·`PATCH`·`DELETE` 요청에 그 값을 `X-XSRF-TOKEN` 헤더로 실어 보낸다.
+- 헤더가 없거나 값이 일치하지 않으면 `403`을 반환한다.
+- `GET`을 비롯한 조회 요청은 해당하지 않는다.
+
+## 1.8 로그인 표시 쿠키
+
+인증 쿠키는 `HttpOnly`라 클라이언트가 읽을 수 없다. 앱 시작 시 로그인 화면을 띄울지 판단할 수 있도록, 값에 의미가 없는 표시용 쿠키를 함께 발급한다.
+
+| 항목 | 값 |
+|---|---|
+| 이름·값 | `logged_in=1` |
+| 속성 | `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age`는 Refresh와 동일(7일). **`HttpOnly`가 아니다** |
+| 내용 | 개인정보·식별자를 담지 않는다. 존재 여부만 의미가 있다 |
+| 발급·갱신 | 로그인 콜백(3.2), 재발급 성공(3.3) |
+| 삭제 | 로그아웃(3.4), 회원 탈퇴(3.6) |
+
+> **UI 힌트 전용이다. 인가 판단에 사용하지 않는다.**
+>
+> 실제 인가는 서버가 **매 요청** 인증 쿠키를 검증해 수행한다. 이 쿠키는 브라우저에 남아 있어도 세션이 이미 무효일 수 있다(예: Refresh 만료, 다른 기기에서 로그아웃). 그 경우 첫 API 호출이 `401`을 반환하므로, 클라이언트는 재발급(3.3)을 시도하고 실패하면 로그인 화면으로 유도한다.
+>
+> 이 쿠키의 존재를 근거로 보호 화면을 렌더링하는 것은 무방하다. 이 쿠키의 존재를 근거로 **권한이 있다고 판단하는 것은 안 된다.**
+
 ---
 
 # 2. Endpoint 전체 목록
+
+아래 표의 Endpoint는 모두 기본 경로 `/api/core/v1` 뒤에 붙는 상대 경로다. 예를 들어 `/auth/logout`의 전체 경로는 `/api/core/v1/auth/logout`이다. 3장 이후의 상세에서는 전체 경로로 표기한다.
 
 ## 2.1 인증·계정
 
 | Method | Endpoint | 설명 |
 |---|---|---|
 | GET | `/auth/{provider}/login` | 소셜 로그인 시작 |
-| GET | `/auth/{provider}/callback` | 소셜 로그인 콜백 (토큰 발급 또는 가입 분기) |
+| GET | `/auth/{provider}/callback` | 소셜 로그인 콜백 (신규면 가입 처리 후 인증 쿠키 발급) |
 | POST | `/auth/refresh` | Access Token 재발급 |
 | POST | `/auth/logout` | 로그아웃 (Refresh Token 무효화) |
-| POST | `/me/agreements` | 필수 약관 동의 + 가입 확정 |
 | GET | `/me/summary` | 마이페이지 요약 (계정 정보 + Record·Collection·팔로워·팔로잉 수) |
 | DELETE | `/me` | 회원 탈퇴 |
 
@@ -231,68 +267,65 @@ naver
 GET /api/core/v1/auth/{provider}/callback?code={code}&state={state}
 ```
 
-공급자 인증 후 분기한다.
+공급자 인증 후 다음을 수행한다.
 
-기존 회원 (활성 `social_account` 존재):
+- 활성 `social_account`가 있으면 그 회원으로 로그인한다.
+- 없으면 이 시점에 `member`와 `social_account`를 생성한다. 소셜 인증 성공이 곧 가입 완료다.
+- 두 경우 모두 인증 쿠키를 발급하고 클라이언트 애플리케이션으로 리다이렉트한다.
 
-```json
-{ "success": true, "data": { "status": "LOGIN", "memberId": 1201, "accessToken": "…", "refreshToken": "…" } }
-```
+필수 약관은 클라이언트가 로그인 시작 이전 화면에서 안내하며, 서버는 동의 여부를 받지도 저장하지도 않는다.
 
-신규 (가입 미완료):
-
-```json
-{ "success": true, "data": { "status": "SIGNUP_REQUIRED", "signupToken": "…" } }
-```
-
-- 신규는 이 시점에 `member`를 생성하지 않는다. 약관 동의 화면으로 유도할 **가입 토큰**(단기, 예: 10분)만 발급한다.
-- `signupToken`으로는 3.3 외 어떤 API도 호출할 수 없다.
-
-## 3.3 약관 동의 (가입 확정)
+응답에 본문이 없다. 인증 정보는 `Set-Cookie`로만 전달하므로 공통 응답 봉투(1.6)가 적용되지 않는다.
 
 ```http
-POST /api/core/v1/me/agreements
-Authorization: Bearer {signupToken}
+HTTP/1.1 302 Found
+Location: /auth/callback
+Set-Cookie: accessToken=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core/v1
+Set-Cookie: refreshToken=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core/v1/auth
+Set-Cookie: logged_in=1; Secure; SameSite=Lax; Path=/
 ```
 
-```json
-{
-  "agreed": true
-}
+`logged_in`만 `HttpOnly`가 아니다(1.8). 나머지 속성 근거는 1.1에 있다.
+
+복귀 경로는 성공·실패 모두 `/auth/callback` 하나이며, 실패 시에만 `error` query가 붙는다.
+
+```text
+성공: /auth/callback
+실패: /auth/callback?error=OAUTH_FAILED
 ```
 
-- 필수 동의가 `true`가 아니면 400.
-- 동작: `member` + `social_account` 생성(가입 확정) 후 토큰 발급.
+- 복귀 경로는 **서버 설정값**이며 요청 파라미터로 받지 않는다. 임의 URL을 받으면 open redirect 취약점이 된다.
+- 로그인 이전 화면으로 되돌아가는 처리는 클라이언트가 담당한다(로그인 시작 전 경로를 `sessionStorage` 등에 보관).
 
-```json
-{ "success": true, "data": { "memberId": 1201, "accessToken": "…", "refreshToken": "…" } }
-```
-
-201.
-
-## 3.4 토큰 재발급
+## 3.3 토큰 재발급
 
 ```http
 POST /api/core/v1/auth/refresh
 ```
 
-```json
-{ "refreshToken": "…" }
-```
+요청 본문이 없다. Refresh 쿠키로 식별한다.
 
-- 200: `{ "success": true, "data": { "accessToken": "…", "refreshToken": "…" } }` (Refresh도 회전 발급)
-- 만료·무효 Refresh: 401 → 프론트는 재로그인으로 유도.
+- **204**: 새 Access·Refresh 쿠키를 `Set-Cookie`로 발급하고 표시 쿠키(1.8)의 만료를 함께 갱신한다(Refresh도 회전 발급). 본문이 없으므로 봉투(1.6)가 적용되지 않는다.
+- 만료·무효, 또는 회전 전 Refresh 재사용: 401. 오류 응답은 봉투를 따른다(1.5). 클라이언트는 재로그인으로 유도한다.
 
-## 3.5 로그아웃
+회전 발급이므로 재발급 요청은 **동시에 하나만** 보낸다. 401이 여러 건 동시에 발생해도 재발급은 한 번만 호출하고 나머지 요청은 그 결과를 기다린다.
+
+## 3.4 로그아웃
 
 ```http
 POST /api/core/v1/auth/logout
 ```
 
-- 동작: Refresh Token 무효화. Access는 만료로 자연 소멸.
+- 동작: Refresh Token을 무효화하고 Access·Refresh 쿠키와 표시 쿠키(1.8)를 모두 만료시킨다.
 - 204.
 
-## 3.6 마이페이지 요약
+무효화 대상은 **Refresh 쿠키로 식별한다.** 이 경로는 Refresh 쿠키의 `Path` 범위(`/api/core/v1/auth`) 안에 있으므로 쿠키가 함께 전송된다.
+
+- Access가 이미 만료됐어도 로그아웃은 동작한다. Refresh 쿠키만으로 대상을 특정할 수 있기 때문이다.
+- 해당 세션 하나만 무효화한다. 다른 기기의 로그인은 유지된다.
+- Refresh 쿠키가 없거나 이미 무효한 경우에도 **204**를 반환한다. 서버에 지울 것이 없을 뿐이고, 쿠키 정리는 그대로 수행한다. 이미 로그아웃된 상태를 오류로 취급하지 않는다.
+
+## 3.5 마이페이지 요약
 
 ```http
 GET /api/core/v1/me/summary
@@ -316,7 +349,31 @@ GET /api/core/v1/me/summary
 
 - 카운트는 모두 활성 데이터 기준 집계다.
 - 팔로워·팔로잉 목록은 제공하지 않는다. 수치는 본인만 볼 수 있다.
-- `memberId`는 로그인 응답(3.2 LOGIN, 3.3)에서 이미 전달되므로 여기서는 반환하지 않는다.
+- `memberId`는 반환하지 않는다. 개인 API는 서버가 쿠키로 사용자를 식별하므로 클라이언트가 자신의 내부 ID를 알 필요가 없다(1.1).
+
+## 3.6 회원 탈퇴
+
+```http
+DELETE /api/core/v1/me
+```
+
+- 204. 응답 본문이 없다.
+- 되돌릴 수 없다. 클라이언트는 실행 전 확인 절차를 둔다.
+
+동작은 정책 정의서 10장을 따른다.
+
+| 대상 | 처리 |
+|---|---|
+| `member`, `social_account` | 소프트 삭제 |
+| `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제 |
+| `social_account`의 `provider_user_id`, `email` | **마스킹**(개인정보 파기 대상) |
+| Refresh Token | 해당 회원의 **모든** Refresh를 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
+| `place` | 공용 데이터이므로 유지한다 |
+
+이 경로는 Refresh 쿠키의 `Path` 범위 밖이라 Refresh 쿠키가 전송되지 않는다. 따라서 **Access 쿠키로 회원을 식별하고 그 회원의 Refresh를 전부 무효화한다.** 탈퇴는 모든 기기에서 즉시 로그아웃되어야 하므로 전체 무효화가 의도된 동작이다. Access가 만료된 상태라면 인증 실패(401)이므로, 클라이언트는 재발급(3.3) 후 다시 요청한다.
+
+- 탈퇴한 사용자의 Shelf와 Collection은 다른 사용자의 Library·Feed에서 즉시 제외한다.
+- 활성 `social_account`가 사라지므로, 같은 소셜 계정으로 다시 로그인하면 **신규 회원으로 가입**된다(3.2). 과거 데이터는 복구되지 않는다.
 
 ---
 
