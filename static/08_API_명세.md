@@ -1156,11 +1156,15 @@ GET /api/core/v1/feed/collections?cursor={cursor}&size=20
 
 규칙:
 
-- 공개 가능한 Keyword만 반환
-- AI 처리가 끝나지 않았다면 `keywords: []`
-- AI 미완료 Collection도 Feed 후보에 포함 가능
-- Context 원문과 사용자 신원은 반환하지 않음
+- `size` 기본 20. 커서는 공통 페이지네이션 계약(1.4)을 따르며 `cursor`는 opaque 문자열이다.
+- `requestId`는 Feed Session 식별자다. 같은 Session의 다음 페이지는 `nextCursor`로 이어받고, 클라이언트는 이 값을 10.2의 이벤트 요청에 그대로 돌려보낸다.
+- 공개 가능한 `PUBLIC` Keyword만 반환한다. `PRIVATE_ONLY`·`BLOCKED`는 타인 노출과 타인 Collection 특징 계산 모두에서 제외한다.
+- AI 처리가 끝나지 않았다면 `keywords: []`다. 오류가 아니다.
+- AI 미완료 Collection도 Feed 후보에 포함한다.
+- Context 원문과 사용자 신원은 반환하지 않는다. **소유자 식별자(`memberId` 등)를 응답에 넣지 않는다.**
 - 상세 조회는 IMPRESSION 기록 대상이 아님
+
+후보 채널·점수 구성·가중치 등 추천 정책은 [AI 설계](05_AI_설계.md) 14장이 정본이다.
 
 Collection 선택:
 
@@ -1176,27 +1180,15 @@ GET /api/core/v1/collections/{collectionId}
 POST /api/core/v1/feed/events
 ```
 
-CLICK:
+`requestId`는 배열 바깥의 별도 필드다. 10.1 응답에서 받은 값을 그대로 돌려보낸다. 이벤트는 배열로 묶어 한 번에 보낸다.
 
 ```json
 {
-  "event": "CLICK",
-  "collectionId": 7001,
-  "placeId": null,
   "requestId": "5b2c0000-0000-0000-0000-000000000000",
-  "position": 0
-}
-```
-
-SAVE:
-
-```json
-{
-  "event": "SAVE",
-  "collectionId": 7001,
-  "placeId": 5501,
-  "requestId": "5b2c0000-0000-0000-0000-000000000000",
-  "position": 0
+  "events": [
+    { "event": "CLICK", "collectionId": 7001, "placeId": null, "position": 0 },
+    { "event": "SAVE",  "collectionId": 7001, "placeId": 5501, "position": 0 }
+  ]
 }
 ```
 
@@ -1206,7 +1198,15 @@ SAVE:
 204 No Content
 ```
 
-IMPRESSION은 클라이언트가 보내지 않는다.
+규칙:
+
+- `events` 배열의 크기 상한은 **100개**다. 초과하면 `400 INVALID_INPUT`이다. `recordIds` 배열과 같은 값이며 근거는 [파트간 요구사항](05-1_파트간_요구사항.md) 1.5에 있다.
+- `event`는 `CLICK`·`SAVE`만 허용한다. **IMPRESSION은 서버가 10.1 응답 생성 시 기록하므로 클라이언트가 보내면 `400`으로 거부한다.**
+- 사용자 식별자는 본문으로 받지 않는다. 인증 컨텍스트에서 가져온다.
+- `placeId`는 Collection 안의 특정 Place를 대상으로 한 경우에만 채우고, 아니면 `null`이다.
+- `position`은 10.1 응답에서 받은 값을 그대로 돌려보낸다.
+- 이벤트는 관측 로그이므로 개별 항목이 유효하지 않으면(예: 삭제된 Collection) 그 항목만 버리고 나머지는 저장한다. 부분 실패로 전체를 실패시키지 않는다.
+- 쓰기 전용이며 어떤 조회 결과도 반환하지 않는다.
 
 ---
 
