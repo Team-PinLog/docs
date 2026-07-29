@@ -29,7 +29,7 @@ erDiagram
         bigint member_id FK
         varchar provider "GOOGLE/KAKAO/NAVER"
         varchar provider_user_id "탈퇴 시 마스킹"
-        varchar email "설정 표시용, 탈퇴 시 마스킹, 필수"
+        varchar email "설정 표시용, 탈퇴 시 마스킹"
         timestamptz created_at
         timestamptz deleted_at
     }
