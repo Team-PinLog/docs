@@ -168,6 +168,20 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 >
 > 이 쿠키의 존재를 근거로 보호 화면을 렌더링하는 것은 무방하다. 이 쿠키의 존재를 근거로 **권한이 있다고 판단하는 것은 안 된다.**
 
+## 1.9 요청 입력 크기 상한
+
+서버가 요청 입력에 방어 상한을 둔다. 초과하면 `400 INVALID_INPUT`이며 위반 필드가 `error.fieldErrors`(1.5)에 담긴다.
+
+| 대상 | 상한 | 적용 |
+|---|---|---|
+| Context 본문 | **500자** | `POST /records`의 `contextBody`(5.1) · `POST /records/{recordId}/contexts`의 `body`(5.4) · `PATCH /records/{recordId}/contexts/{contextId}`의 `body`(5.5) |
+| `recordIds` 배열 | **100개** | `POST /collections`(7.1) · `POST /collections/{collectionId}/records`(7.5) |
+| `events` 배열 | **100개** | `POST /feed/events`(10.2) |
+
+배열 상한 100은 목록 조회의 방어 상한(1.4의 `size`)과 **같은 값**이다. 요청마다 상한을 따로 정하면 클라이언트가 외울 값이 늘어난다.
+
+> **Context 입력 필드에는 클라이언트도 `maxlength=500`을 건다.** 서버만 막으면 사용자가 긴 글을 다 쓴 뒤에 거절당한다. 저장 이유 메모는 한 번에 쓰는 성격이라 그 시점에 본문을 잃으면 체감이 나쁘다 — 남은 글자 수를 함께 표시한다([파트간 요구사항](05-1_파트간_요구사항.md) 1.5).
+
 ---
 
 # 2. Endpoint 전체 목록
@@ -501,6 +515,7 @@ POST /api/core/v1/records
 - 프론트가 카카오 로컬 API 응답의 장소 데이터를 그대로 전달한다.
 - 서버는 `kakaoPlaceId` 기준으로 내부 Place를 upsert한다. 동일 `kakaoPlaceId`의 Place가 이미 있으면 전달된 값으로 갱신하지 않고 기존 행을 재사용한다(저장 시점 스냅샷 원칙).
 - 필수: `kakaoPlaceId`, `name`, `address`, `lat`, `lng`. 좌표 범위 등 형식 검증 실패 시 400.
+- `contextBody`는 최대 **500자**다(1.9).
 
 동일 장소에 내 활성 Record가 이미 있으면 거절하지 않고 **기존 Record에 Context만 추가**한다.
 
@@ -589,6 +604,7 @@ POST /api/core/v1/records/{recordId}/contexts
 ```
 
 - 공백만이면 400.
+- `body`는 최대 **500자**다(1.9).
 
 201:
 
@@ -615,6 +631,8 @@ PATCH /api/core/v1/records/{recordId}/contexts/{contextId}
   "body": "주말 오후에 다시 가고 싶은 카페"
 }
 ```
+
+`body`는 최대 **500자**다(1.9).
 
 Context 수정은 내부적으로 기존 Context를 소프트 삭제하고 새 Context를 생성하는 교체 방식으로 처리할 수 있다.
 
@@ -800,7 +818,7 @@ POST /api/core/v1/collections
 
 - 제목 필수
 - 제목 최대 20자
-- Record 1개 이상
+- Record 1개 이상, `recordIds` 최대 **100개**(1.9)
 - 본인 활성 Record만 추가 가능
 - 생성 즉시 자동 발행
 - 동일 Record 중복 추가 금지
@@ -959,6 +977,7 @@ POST /api/core/v1/collections/{collectionId}/records
 }
 ```
 
+- `recordIds`는 최대 **100개**다(1.9).
 - 이미 담긴 Record가 섞여 있으면 실패시키지 않고 **중복만 건너뛰고 나머지를 담는다**(멱등).
 - 각 관계의 `collection_records.created_at`이 Collection 내부 표시 순서의 기준이 된다.
 
@@ -1247,7 +1266,7 @@ POST /api/core/v1/feed/events
 
 규칙:
 
-- `events` 배열의 크기 상한은 **100개**다. 초과하면 `400 INVALID_INPUT`이다. `recordIds` 배열과 같은 값이며 근거는 [파트간 요구사항](05-1_파트간_요구사항.md) 1.5에 있다.
+- `events` 배열의 크기 상한은 **100개**다. 초과하면 `400 INVALID_INPUT`이다(1.9).
 - `event`는 `CLICK`·`SAVE`만 허용한다. **IMPRESSION은 서버가 10.1 응답 생성 시 기록하므로 클라이언트가 보내면 `400`으로 거부한다.**
 - 사용자 식별자는 본문으로 받지 않는다. 인증 컨텍스트에서 가져온다.
 - `placeId`는 Collection 안의 특정 Place를 대상으로 한 경우에만 채우고, 아니면 `null`이다.
