@@ -72,7 +72,7 @@ erDiagram
         bigint member_id FK
         varchar title "20자"
         boolean is_published
-        timestamptz published_at "NOT NULL, DEFAULT now()"
+        timestamptz published_at "발행 시 필수 (CHECK)"
         int record_count "활성 연결 수 비정규화"
         timestamptz created_at
         timestamptz updated_at
