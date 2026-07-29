@@ -22,6 +22,8 @@ MVP REST API 명세입니다. 데이터 구조는 데이터 모델 및 무결성
 - Refresh Token은 **Redis**에 저장한다(로그아웃 무효화·회전 발급 관리, TTL 자동 만료).
 - 토큰은 **`HttpOnly` + `Secure` + `SameSite=Lax` 쿠키**로 발급한다. 응답 본문에 토큰을 담지 않으며 클라이언트 스크립트는 토큰을 읽을 수 없다.
 - 클라이언트는 요청에 자격증명을 포함시키기만 한다(`credentials: include` / `withCredentials`). 인증 헤더를 직접 구성하지 않는다.
+- 쿠키 이름은 `access_token`·`refresh_token`이다. 둘 다 `HttpOnly`이므로 클라이언트가 이름으로 접근할 일은 없다.
+- Access 쿠키는 `Path=/api/core`(context-path)로 발급한다. 모든 API 요청에 실려야 하고, 그 밖으로 나갈 필요는 없다.
 - Refresh 쿠키는 `Path=/api/core/v1/auth`로 제한해 일반 API 요청(`/records` 등)에 실리지 않게 한다. 재발급과 로그아웃이 모두 이 범위에 들어간다.
 - 프론트엔드와 API는 같은 오리진에서 서비스한다. 따라서 `SameSite=None`과 CORS 자격증명 설정이 필요하지 않다.
 - 인증 쿠키와 별개로, 클라이언트가 로그인 여부를 판단할 수 있도록 **표시용 쿠키**를 함께 발급한다(1.8).
@@ -137,6 +139,16 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 - 클라이언트는 `POST`·`PUT`·`PATCH`·`DELETE` 요청에 그 값을 `X-XSRF-TOKEN` 헤더로 실어 보낸다.
 - 헤더가 없거나 값이 일치하지 않으면 `403`을 반환한다.
 - `GET`을 비롯한 조회 요청은 해당하지 않는다.
+
+| 항목 | 값 |
+|---|---|
+| 이름 | `XSRF-TOKEN` |
+| 속성 | `Secure`, `SameSite=Lax`, **`Path=/`**. **`HttpOnly`가 아니다** |
+| 발급 시점 | 조회 요청을 포함한 모든 요청의 응답. 클라이언트는 첫 `GET` 응답에서 값을 얻으므로 토큰 전용 엔드포인트를 호출하지 않는다 |
+
+> **`Path=/`는 이 쿠키가 동작하기 위한 조건이다.**
+>
+> 읽는 주체가 브라우저 JS이므로, `Path`를 API 경로(`/api/core`)로 좁히면 프론트 페이지(`/`·`/auth/callback`)의 `document.cookie`에 **나타나지 않는다.** 그러면 클라이언트는 `X-XSRF-TOKEN`에 넣을 값을 구할 방법이 없고 상태 변경 요청이 **전부 `403`**이 된다. 표시 쿠키(1.8)와 같은 판단이다 — 읽는 주체가 JS인 쿠키는 `Path=/`여야 한다.
 
 ## 1.8 로그인 표시 쿠키
 
@@ -280,8 +292,8 @@ GET /api/core/v1/auth/{provider}/callback?code={code}&state={state}
 ```http
 HTTP/1.1 302 Found
 Location: /auth/callback
-Set-Cookie: accessToken=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core/v1
-Set-Cookie: refreshToken=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core/v1/auth
+Set-Cookie: access_token=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core
+Set-Cookie: refresh_token=…; HttpOnly; Secure; SameSite=Lax; Path=/api/core/v1/auth
 Set-Cookie: logged_in=1; Secure; SameSite=Lax; Path=/
 ```
 
