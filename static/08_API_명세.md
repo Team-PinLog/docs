@@ -367,8 +367,41 @@ DELETE /api/core/v1/me
 | `member`, `social_account` | 소프트 삭제 |
 | `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제 |
 | `social_account`의 `provider_user_id`, `email` | **마스킹**(개인정보 파기 대상) |
+| `ai.context_ai_state` | 두 status를 `CANCELLED`로 전이 |
+| `ai.context_embedding` | `is_deleted = true` 표시 |
 | Refresh Token | 해당 회원의 **모든** Refresh를 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
 | `place` | 공용 데이터이므로 유지한다 |
+
+### AI 파생 데이터
+
+Context가 소프트 삭제될 때 함께 처리한다. **물리 삭제가 아니라 무효화 표시다.**
+
+| 표시 | 효과 |
+|---|---|
+| `context_ai_state`의 두 status → `CANCELLED` | 진행 중인 AI 작업을 취소해 **늦게 도착한 결과가 저장되는 것을 막고**, 키워드 조회에서 제외한다 |
+| `context_embedding.is_deleted = true` | 검색 대상에서 제외하고 물리 삭제 대상으로 식별한다 |
+
+```sql
+UPDATE ai.context_ai_state
+SET embedding_status = 'CANCELLED',
+    keyword_status   = 'CANCELLED',
+    updated_at       = now()
+WHERE context_id = ?;
+-- 조건 없음. COMPLETED·FAILED도 덮는다. CANCELLED가 다른 모든 상태보다 우선한다(05 §11.1).
+
+UPDATE ai.context_embedding
+SET is_deleted = true, updated_at = now()
+WHERE context_id = ?;
+-- 영향 행이 0이어도 정상이다(Embedding 생성 전에 삭제된 경우).
+-- 늦게 도착하는 INSERT는 State의 CANCELLED가 차단한다(05 §11.2).
+```
+
+- **`CANCELLED` 전이에 조건을 걸지 않는다.** `COMPLETED`도 덮어야 한다. `context_keyword`에는 `is_deleted`에 해당하는 컬럼이 없어, 키워드 조회 제외를 오직 `keyword_status = 'CANCELLED'`가 담당하기 때문이다. `COMPLETED`를 남기면 임베딩 검색에서는 걸러지지만 **키워드 조회에서 탈퇴한 사용자의 키워드가 계속 노출된다.**
+- `is_deleted` UPDATE의 **영향 행이 0이어도 오류로 처리하지 않는다.**
+- 두 컬럼 모두 **백엔드(Spring)가 변경한다.** FastAPI는 건드리지 않는다(05 §6.4·§12.3). 반대로 Finalizer는 `CANCELLED`를 `FAILED`로 덮어쓸 수 없다(05 §12).
+- `ai.context_keyword`는 별도 처리가 필요 없다. 조회가 `context_ai_state`를 조인해 `keyword_status = 'COMPLETED'`로 거르므로 자동 제외된다(05 §9·§11.2). 백엔드는 이 테이블에 쓰지 않고 읽기 조인만 한다.
+- 물리 삭제 시점은 이 명세의 범위가 아니며 개인정보 정책을 따른다(07 §5).
+- 같은 처리를 Record 삭제(5.6·5.7)에도 적용한다. 탈퇴 전용 동작이 아니다.
 
 이 경로는 Refresh 쿠키의 `Path` 범위 밖이라 Refresh 쿠키가 전송되지 않는다. 따라서 **Access 쿠키로 회원을 식별하고 그 회원의 Refresh를 전부 무효화한다.** 탈퇴는 모든 기기에서 즉시 로그아웃되어야 하므로 전체 무효화가 의도된 동작이다. Access가 만료된 상태라면 인증 실패(401)이므로, 클라이언트는 재발급(3.3) 후 다시 요청한다.
 
