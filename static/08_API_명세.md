@@ -932,10 +932,12 @@ DELETE /api/core/v1/collections/{collectionId}/records/{recordId}
 ## 8.1 최초 공개 책장 탐색
 
 ```http
-GET /api/core/v1/feed/collections/{collectionId}/shelf?cursor={cursor}&size=10
+GET /api/core/v1/feed/collections/{collectionId}/shelf?cursor={cursor}&size=20
 ```
 
 `collectionId`를 공개 진입점으로 사용해 해당 Collection 작성자의 다른 공개 Collection을 조회한다.
+
+`size`는 공통 커서 계약을 따른다 — 기본값 `CursorPage.DEFAULT_SIZE`(20), 서버 방어 상한 `CursorPage.MAX_SIZE`(100), 범위 밖 값은 `CursorPage.normalizeSize`가 보정한다. 같은 Feed 네임스페이스의 `GET /feed/collections`와 기본 크기를 맞춘다.
 
 응답:
 
