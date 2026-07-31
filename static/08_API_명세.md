@@ -239,7 +239,8 @@ Context 목록은 별도 API 없이 Record 상세(`GET /records/{recordId}`)의 
 | DELETE | `/collections/{collectionId}` | 소유자의 Collection 삭제 |
 | POST | `/collections/{collectionId}/records` | 소유자의 Record 추가 |
 | DELETE | `/collections/{collectionId}/records/{recordId}` | 소유자의 Record 제거 |
-공개 책장 탐색은 Feed 네임스페이스(2.7), 책장 Follow는 Follow 네임스페이스(2.6)를 사용한다.
+| GET | `/collections/{collectionId}/shelf` | Collection 작성자의 공개 책장 탐색 (8.1) |
+책장 Follow는 Follow 네임스페이스(2.6)를 사용한다.
 
 ## 2.6 Follow
 
@@ -258,8 +259,9 @@ Library는 프론트 페이지 명칭이며 전용 Endpoint가 없다. 내 책�
 | Method | Endpoint | 설명 |
 |---|---|---|
 | GET | `/feed/collections` | 추천 Collection 목록 |
-| GET | `/feed/collections/{collectionId}/shelf` | Collection 작성자의 공개 책장 탐색 |
 | POST | `/feed/events` | CLICK·SAVE 이벤트 수집 |
+
+Feed 네임스페이스에는 추천 점수와 노출 이벤트를 다루는 Endpoint만 둔다. 공개 책장 탐색(8.1)은 추천 계산을 거치지 않고 `collectionId`로 작성자의 공개 Collection을 조회하므로 Collection 네임스페이스(2.5)에 둔다.
 
 Collection 상세은 Feed 전용 URL을 만들지 않고 공통 Endpoint를 사용한다.
 
@@ -1000,12 +1002,12 @@ DELETE /api/core/v1/collections/{collectionId}/records/{recordId}
 ## 8.1 최초 공개 책장 탐색
 
 ```http
-GET /api/core/v1/feed/collections/{collectionId}/shelf?cursor={cursor}&size=20
+GET /api/core/v1/collections/{collectionId}/shelf?cursor={cursor}&size=20
 ```
 
-`collectionId`를 공개 진입점으로 사용해 해당 Collection 작성자의 다른 공개 Collection을 조회한다.
+`collectionId`를 공개 진입점으로 사용해 해당 Collection 작성자의 다른 공개 Collection을 조회한다. 추천 점수를 계산하지 않으므로 Feed 네임스페이스가 아니라 Collection 네임스페이스(2.5)에 둔다 — Feed에서 진입하는 것은 흐름이고, 조회 대상은 작성자의 공개 Collection이다.
 
-`size`는 공통 커서 계약을 따른다 — 기본값 `CursorPage.DEFAULT_SIZE`(20), 서버 방어 상한 `CursorPage.MAX_SIZE`(100), 범위 밖 값은 `CursorPage.normalizeSize`가 보정한다. 같은 Feed 네임스페이스의 `GET /feed/collections`와 기본 크기를 맞춘다.
+`size`는 공통 커서 계약을 따른다 — 기본값 `CursorPage.DEFAULT_SIZE`(20), 서버 방어 상한 `CursorPage.MAX_SIZE`(100), 범위 밖 값은 `CursorPage.normalizeSize`가 보정한다. 탐색 흐름에서 앞에 오는 `GET /feed/collections`와 기본 크기를 맞춘다.
 
 응답:
 
@@ -1455,7 +1457,7 @@ GET /collections/{collectionId}?recordCursor={recordCursor}&recordSize=2
 ```text
 GET  /feed/collections
 → GET  /collections/{collectionId}
-→ GET  /feed/collections/{collectionId}/shelf
+→ GET  /collections/{collectionId}/shelf
 → POST /follows { collectionId }
 → followId 반환
 ```
