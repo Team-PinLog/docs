@@ -246,7 +246,7 @@ Context 목록은 별도 API 없이 Record 상세(`GET /records/{recordId}`)의 
 | Method | Endpoint | 설명 |
 |---|---|---|
 | POST | `/follows` | Follow 생성 (body의 `collectionId`로 작성자 식별) |
-| GET | `/follows` | 내 팔로우 목록 페이지네이션 |
+| GET | `/follows` | 내 팔로우 목록 페이지네이션. `collectionSize`를 주면 책장별 Collection 첫 페이지를 함께 반환(9.2) |
 | GET | `/follows/{followId}/collections` | 팔로우 유저의 공개 Collection 목록 페이지네이션 |
 | PATCH | `/follows/{followId}` | Follow 별칭 수정·제거 |
 | DELETE | `/follows/{followId}` | Follow 해제 |
@@ -1143,6 +1143,10 @@ Library는 프론트 페이지 명칭이고, Shelf(책장)는 사용자별 Colle
 
 세 커서(팔로우 목록·책장별 Collection·Record)는 독립적이며 혼용할 수 없다.
 
+**첫 화면은 `GET /follows`에 `collectionSize`를 더해 한 번에 받는다.** 책장마다 표지를 그려야 하는데 팔로우 목록 응답에 Collection이 없으면 책장 N개에 호출이 `1 + N`회가 된다. `collectionSize`를 주면 각 항목에 그 책장의 Collection 첫 페이지가 함께 실린다(9.2).
+
+커서 독립 원칙은 그대로다 — 커서를 합치는 것이 아니라 **각 축의 첫 페이지를 한 응답에 실어 보내는 것**이다. 더보기는 여전히 `GET /follows/{followId}/collections`(9.3)이며, 9.2가 준 `collections.nextCursor`를 그대로 넣는다.
+
 ## 9.2 팔로우 목록
 
 ```http
@@ -1165,6 +1169,55 @@ GET /api/core/v1/follows?cursor={cursor}&size=2
 
 - 현재 로그인 사용자의 활성 Follow만 반환한다.
 - 팔로우 대상의 신원 정보(내부 사용자 ID 등)는 포함하지 않는다.
+
+### 책장별 Collection 함께 받기 — `collectionSize`
+
+```http
+GET /api/core/v1/follows?cursor={cursor}&size=10&collectionSize=5
+```
+
+| 파라미터 | 필수 | 설명 |
+|---|:---:|---|
+| `cursor`·`size` | X | **팔로우 축**. 공통 커서 계약(1.4)을 따른다 |
+| `collectionSize` | X | **각 책장의 Collection 축**. 주면 항목마다 `collections`가 실린다. 없으면 위 기본 응답과 같다 |
+
+중첩 축에 접두어를 붙이는 것은 7.3(`recordCursor`·`recordSize`)과 같은 규약이다. 바깥 축은 이 Endpoint가 돌려주는 자기 축이므로 접두어 없이 `cursor`·`size`를 쓴다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "followId": 701,
+        "alias": "서울 카페",
+        "createdAt": "2026-07-23T10:00:00Z",
+        "collections": {
+          "items": [
+            {
+              "collectionId": 7001,
+              "title": "연남 카페",
+              "recordCount": 3,
+              "keywords": ["조용한", "커피"],
+              "createdAt": "2026-07-18T10:00:00Z"
+            }
+          ],
+          "nextCursor": "opaque-cursor",
+          "hasNext": true
+        }
+      }
+    ],
+    "nextCursor": "opaque-cursor",
+    "hasNext": true
+  }
+}
+```
+
+- `collections`의 항목 형태는 9.3과 같다.
+- `collections.nextCursor`는 **그 책장 전용**이며 9.3 Endpoint에 그대로 넣어 이어받는다. 바깥 `nextCursor`(팔로우 축)와 섞지 않는다.
+- Collection이 없는 책장도 항목으로 나오며 `collections.items`가 빈 배열이다.
+- `collectionSize`를 주지 않으면 `collections` 필드 자체가 없다. 기존 호출은 영향받지 않는다.
+- 서버는 페이지 전체의 Collection을 **한 번의 질의로** 모은다. 책장 수만큼 질의하지 않는다.
 
 ## 9.3 팔로우 책장의 Collection 목록
 
