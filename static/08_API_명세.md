@@ -100,17 +100,17 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 
 권장 상태 코드:
 
-| 상태 | 의미 |
-|---:|---|
-| `200` | 조회·수정 성공 |
-| `201` | 리소스 생성 성공 |
-| `204` | 응답 본문 없는 성공 |
-| `400` | 형식 또는 입력값 오류 |
-| `401` | 인증 필요 |
+|  상태 | 의미                                                           |
+| ----: | -------------------------------------------------------------- |
+| `200` | 조회·수정 성공                                                 |
+| `201` | 리소스 생성 성공                                               |
+| `204` | 응답 본문 없는 성공                                            |
+| `400` | 형식 또는 입력값 오류                                          |
+| `401` | 인증 필요                                                      |
 | `403` | CSRF 토큰 누락·불일치 (자원 접근 권한 실패는 1.2에 따라 `404`) |
-| `404` | 리소스 없음 또는 접근 권한 없음 |
-| `409` | 상태 충돌 (연쇄 삭제 확인 필요 등) |
-| `422` | 도메인 규칙 위반 |
+| `404` | 리소스 없음 또는 접근 권한 없음                                |
+| `409` | 상태 충돌 (연쇄 삭제 확인 필요 등)                             |
+| `422` | 도메인 규칙 위반                                               |
 
 ## 1.6 공통 응답 형식
 
@@ -140,10 +140,10 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 - 헤더가 없거나 값이 일치하지 않으면 `403`을 반환한다.
 - `GET`을 비롯한 조회 요청은 해당하지 않는다.
 
-| 항목 | 값 |
-|---|---|
-| 이름 | `XSRF-TOKEN` |
-| 속성 | `Secure`, `SameSite=Lax`, **`Path=/`**. **`HttpOnly`가 아니다** |
+| 항목      | 값                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 이름      | `XSRF-TOKEN`                                                                                                             |
+| 속성      | `Secure`, `SameSite=Lax`, **`Path=/`**. **`HttpOnly`가 아니다**                                                          |
 | 발급 시점 | 조회 요청을 포함한 모든 요청의 응답. 클라이언트는 첫 `GET` 응답에서 값을 얻으므로 토큰 전용 엔드포인트를 호출하지 않는다 |
 
 > **`Path=/`는 이 쿠키가 동작하기 위한 조건이다.**
@@ -154,13 +154,13 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 
 인증 쿠키는 `HttpOnly`라 클라이언트가 읽을 수 없다. 앱 시작 시 로그인 화면을 띄울지 판단할 수 있도록, 값에 의미가 없는 표시용 쿠키를 함께 발급한다.
 
-| 항목 | 값 |
-|---|---|
-| 이름·값 | `logged_in=1` |
-| 속성 | `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age`는 Refresh와 동일(7일). **`HttpOnly`가 아니다** |
-| 내용 | 개인정보·식별자를 담지 않는다. 존재 여부만 의미가 있다 |
-| 발급·갱신 | 로그인 콜백(3.2), 재발급 성공(3.3) |
-| 삭제 | 로그아웃(3.4), 회원 탈퇴(3.6) |
+| 항목      | 값                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------- |
+| 이름·값   | `logged_in=1`                                                                                |
+| 속성      | `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age`는 Refresh와 동일(7일). **`HttpOnly`가 아니다** |
+| 내용      | 개인정보·식별자를 담지 않는다. 존재 여부만 의미가 있다                                       |
+| 발급·갱신 | 로그인 콜백(3.2), 재발급 성공(3.3)                                                           |
+| 삭제      | 로그아웃(3.4), 회원 탈퇴(3.6)                                                                |
 
 > **UI 힌트 전용이다. 인가 판단에 사용하지 않는다.**
 >
@@ -172,11 +172,11 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 
 서버가 요청 입력에 방어 상한을 둔다. 초과하면 `400 INVALID_INPUT`이며 위반 필드가 `error.fieldErrors`(1.5)에 담긴다.
 
-| 대상 | 상한 | 적용 |
-|---|---|---|
-| Context 본문 | **500자** | `POST /records`의 `contextBody`(5.1) · `POST /records/{recordId}/contexts`의 `body`(5.4) · `PATCH /records/{recordId}/contexts/{contextId}`의 `body`(5.5) |
-| `recordIds` 배열 | **100개** | `POST /collections`(7.1) · `POST /collections/{collectionId}/records`(7.5) |
-| `events` 배열 | **100개** | `POST /feed/events`(10.2) |
+| 대상             | 상한      | 적용                                                                                                                                                      |
+| ---------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context 본문     | **500자** | `POST /records`의 `contextBody`(5.1) · `POST /records/{recordId}/contexts`의 `body`(5.4) · `PATCH /records/{recordId}/contexts/{contextId}`의 `body`(5.5) |
+| `recordIds` 배열 | **100개** | `POST /collections`(7.1) · `POST /collections/{collectionId}/records`(7.5)                                                                                |
+| `events` 배열    | **100개** | `POST /feed/events`(10.2)                                                                                                                                 |
 
 배열 상한 100은 목록 조회의 방어 상한(1.4의 `size`)과 **같은 값**이다. 요청마다 상한을 따로 정하면 클라이언트가 외울 값이 늘어난다.
 
@@ -190,76 +190,77 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 
 ## 2.1 인증·계정
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| GET | `/auth/{provider}/login` | 소셜 로그인 시작 |
-| GET | `/auth/{provider}/callback` | 소셜 로그인 콜백 (신규면 가입 처리 후 인증 쿠키 발급) |
-| POST | `/auth/refresh` | Access Token 재발급 |
-| POST | `/auth/logout` | 로그아웃 (Refresh Token 무효화) |
-| GET | `/me/summary` | 마이페이지 요약 (계정 정보 + Record·Collection·팔로워·팔로잉 수) |
-| DELETE | `/me` | 회원 탈퇴 |
+| Method | Endpoint                    | 설명                                                             |
+| ------ | --------------------------- | ---------------------------------------------------------------- |
+| GET    | `/auth/{provider}/login`    | 소셜 로그인 시작                                                 |
+| GET    | `/auth/{provider}/callback` | 소셜 로그인 콜백 (신규면 가입 처리 후 인증 쿠키 발급)            |
+| POST   | `/auth/refresh`             | Access Token 재발급                                              |
+| POST   | `/auth/logout`              | 로그아웃 (Refresh Token 무효화)                                  |
+| GET    | `/me/summary`               | 마이페이지 요약 (계정 정보 + Record·Collection·팔로워·팔로잉 수) |
+| DELETE | `/me`                       | 회원 탈퇴                                                        |
 
 ## 2.2 Place·지도
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| GET | `/records/map` | 내 활성 Record 기반 지도 마커 조회 |
+| Method | Endpoint       | 설명                               |
+| ------ | -------------- | ---------------------------------- |
+| GET    | `/records/map` | 내 활성 Record 기반 지도 마커 조회 |
 
 장소 검색은 서버 API가 아니다. 프론트가 카카오 로컬 API를 직접 호출하고, Record 생성 시 카카오 응답의 장소 데이터를 서버에 전달한다(5.1).
 
 ## 2.3 Record·Context
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| POST | `/records` | 카카오 Place와 첫 Context로 Record 생성 |
-| GET | `/records/{recordId}` | 내 Record 상세 조회 |
-| GET | `/records/by-place` | kakaoPlaceId로 이 장소의 내 활성 Record 조회 |
-| DELETE | `/records/{recordId}` | Record 소프트 삭제. 마지막 Record인 Collection이 있으면 409 거절 |
-| DELETE | `/records/{recordId}/force` | 안내 확인 후 Record 강제 삭제. 연쇄 Collection 삭제 포함 |
-| POST | `/records/{recordId}/contexts` | Context 추가 |
-| PATCH | `/records/{recordId}/contexts/{contextId}` | Context 교체 방식 수정 |
-| DELETE | `/records/{recordId}/contexts/{contextId}` | Context 삭제 |
+| Method | Endpoint                                   | 설명                                                             |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------- |
+| POST   | `/records`                                 | 카카오 Place와 첫 Context로 Record 생성                          |
+| GET    | `/records/{recordId}`                      | 내 Record 상세 조회                                              |
+| GET    | `/records/by-place`                        | kakaoPlaceId로 이 장소의 내 활성 Record 조회                     |
+| DELETE | `/records/{recordId}`                      | Record 소프트 삭제. 마지막 Record인 Collection이 있으면 409 거절 |
+| DELETE | `/records/{recordId}/force`                | 안내 확인 후 Record 강제 삭제. 연쇄 Collection 삭제 포함         |
+| POST   | `/records/{recordId}/contexts`             | Context 추가                                                     |
+| PATCH  | `/records/{recordId}/contexts/{contextId}` | Context 교체 방식 수정                                           |
+| DELETE | `/records/{recordId}/contexts/{contextId}` | Context 삭제                                                     |
 
 Context 목록은 별도 API 없이 Record 상세(`GET /records/{recordId}`)의 `contexts`를 사용한다.
 
 ## 2.4 AI 자연어 검색
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| POST | `/search/records` | 내 Place·Context·Keyword 기반 AI 자연어 검색 |
+| Method | Endpoint          | 설명                                         |
+| ------ | ----------------- | -------------------------------------------- |
+| POST   | `/search/records` | 내 Place·Context·Keyword 기반 AI 자연어 검색 |
 
 ## 2.5 Collection
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| POST | `/collections` | Collection 생성 및 자동 발행 |
-| GET | `/collections` | 내 Collection 목록 조회 |
-| GET | `/collections/{collectionId}` | 소유권에 따라 개인·공개 상세 조회 |
-| PATCH | `/collections/{collectionId}` | 소유자의 Collection 제목 수정 |
-| DELETE | `/collections/{collectionId}` | 소유자의 Collection 삭제 |
-| POST | `/collections/{collectionId}/records` | 소유자의 Record 추가 |
-| DELETE | `/collections/{collectionId}/records/{recordId}` | 소유자의 Record 제거 |
+| Method | Endpoint                                         | 설명                              |
+| ------ | ------------------------------------------------ | --------------------------------- |
+| POST   | `/collections`                                   | Collection 생성 및 자동 발행      |
+| GET    | `/collections`                                   | 내 Collection 목록 조회           |
+| GET    | `/collections/{collectionId}`                    | 소유권에 따라 개인·공개 상세 조회 |
+| PATCH  | `/collections/{collectionId}`                    | 소유자의 Collection 제목 수정     |
+| DELETE | `/collections/{collectionId}`                    | 소유자의 Collection 삭제          |
+| POST   | `/collections/{collectionId}/records`            | 소유자의 Record 추가              |
+| DELETE | `/collections/{collectionId}/records/{recordId}` | 소유자의 Record 제거              |
+
 공개 책장 탐색은 Feed 네임스페이스(2.7), 책장 Follow는 Follow 네임스페이스(2.6)를 사용한다.
 
 ## 2.6 Follow
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| POST | `/follows` | Follow 생성 (body의 `collectionId`로 작성자 식별) |
-| GET | `/follows` | 내 팔로우 목록 페이지네이션 |
-| GET | `/follows/{followId}/collections` | 팔로우 유저의 공개 Collection 목록 페이지네이션 |
-| PATCH | `/follows/{followId}` | Follow 별칭 수정·제거 |
-| DELETE | `/follows/{followId}` | Follow 해제 |
+| Method | Endpoint                          | 설명                                              |
+| ------ | --------------------------------- | ------------------------------------------------- |
+| POST   | `/follows`                        | Follow 생성 (body의 `collectionId`로 작성자 식별) |
+| GET    | `/follows`                        | 내 팔로우 목록 페이지네이션                       |
+| GET    | `/follows/{followId}/collections` | 팔로우 유저의 공개 Collection 목록 페이지네이션   |
+| PATCH  | `/follows/{followId}`             | Follow 별칭 수정·제거                             |
+| DELETE | `/follows/{followId}`             | Follow 해제                                       |
 
 Library는 프론트 페이지 명칭이며 전용 Endpoint가 없다. 내 책장은 `GET /collections`, 팔로우 책장은 `GET /follows` + `GET /follows/{followId}/collections` 조합으로 구성한다(9장).
 
 ## 2.7 Feed·추천 이벤트
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| GET | `/feed/collections` | 추천 Collection 목록 |
-| GET | `/feed/collections/{collectionId}/shelf` | Collection 작성자의 공개 책장 탐색 |
-| POST | `/feed/events` | CLICK·SAVE 이벤트 수집 |
+| Method | Endpoint                                 | 설명                               |
+| ------ | ---------------------------------------- | ---------------------------------- |
+| GET    | `/feed/collections`                      | 추천 Collection 목록               |
+| GET    | `/feed/collections/{collectionId}/shelf` | Collection 작성자의 공개 책장 탐색 |
+| POST   | `/feed/events`                           | CLICK·SAVE 이벤트 수집             |
 
 Collection 상세은 Feed 전용 URL을 만들지 않고 공통 Endpoint를 사용한다.
 
@@ -392,24 +393,24 @@ DELETE /api/core/v1/me
 
 동작은 정책 정의서 10장을 따른다.
 
-| 대상 | 처리 |
-|---|---|
-| `member`, `social_account` | 소프트 삭제 |
-| `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제 |
-| `social_account`의 `provider_user_id`, `email` | **마스킹**(개인정보 파기 대상) |
-| `ai.context_ai_state` | 두 status를 `CANCELLED`로 전이 |
-| `ai.context_embedding` | `is_deleted = true` 표시 |
-| Refresh Token | 해당 회원의 **모든** Refresh를 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
-| `place` | 공용 데이터이므로 유지한다 |
+| 대상                                                                  | 처리                                                                              |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `member`, `social_account`                                            | 소프트 삭제                                                                       |
+| `record`, `context`, `collection`, `collection_record`, 관련 `follow` | 소프트 삭제                                                                       |
+| `social_account`의 `provider_user_id`, `email`                        | **마스킹**(개인정보 파기 대상)                                                    |
+| `ai.context_ai_state`                                                 | 두 status를 `CANCELLED`로 전이                                                    |
+| `ai.context_embedding`                                                | `is_deleted = true` 표시                                                          |
+| Refresh Token                                                         | 해당 회원의 **모든** Refresh를 무효화하고 인증 쿠키와 표시 쿠키(1.8)를 만료시킨다 |
+| `place`                                                               | 공용 데이터이므로 유지한다                                                        |
 
 ### AI 파생 데이터
 
 Context가 소프트 삭제될 때 함께 처리한다. **물리 삭제가 아니라 무효화 표시다.**
 
-| 표시 | 효과 |
-|---|---|
+| 표시                                         | 효과                                                                                           |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `context_ai_state`의 두 status → `CANCELLED` | 진행 중인 AI 작업을 취소해 **늦게 도착한 결과가 저장되는 것을 막고**, 키워드 조회에서 제외한다 |
-| `context_embedding.is_deleted = true` | 검색 대상에서 제외하고 물리 삭제 대상으로 식별한다 |
+| `context_embedding.is_deleted = true`        | 검색 대상에서 제외하고 물리 삭제 대상으로 식별한다                                             |
 
 ```sql
 UPDATE ai.context_ai_state
@@ -458,12 +459,12 @@ GET /api/core/v1/records/map?swLat={swLat}&swLng={swLng}&neLat={neLat}&neLng={ne
 
 Query:
 
-| 이름 | 필수 | 설명 |
-|---|---:|---|
-| `swLat` | X | 남서 위도 |
-| `swLng` | X | 남서 경도 |
-| `neLat` | X | 북동 위도 |
-| `neLng` | X | 북동 경도 |
+| 이름    | 필수 | 설명      |
+| ------- | ---: | --------- |
+| `swLat` |    X | 남서 위도 |
+| `swLng` |    X | 남서 경도 |
+| `neLat` |    X | 북동 위도 |
+| `neLng` |    X | 북동 경도 |
 
 - bbox 파라미터 없이 호출하면(최초 진입) 내 **전체** 마커를 반환한다.
 - bbox를 주면 해당 범위의 마커만 반환한다(지도 이동 시).
@@ -473,9 +474,20 @@ Query:
 {
   "success": true,
   "data": {
-    "bounds": { "swLat": 37.4979, "swLng": 126.9270, "neLat": 37.5665, "neLng": 127.0557 },
+    "bounds": {
+      "swLat": 37.4979,
+      "swLng": 126.927,
+      "neLat": 37.5665,
+      "neLng": 127.0557
+    },
     "items": [
-      { "recordId": 8801, "placeId": 5501, "name": "앤트러사이트 성수", "lat": 37.5447, "lng": 127.0557 }
+      {
+        "recordId": 8801,
+        "placeId": 5501,
+        "name": "앤트러사이트 성수",
+        "lat": 37.5447,
+        "lng": 127.0557
+      }
     ]
   }
 }
@@ -584,8 +596,8 @@ GET /api/core/v1/records/by-place?kakaoPlaceId=1234567
   "data": {
     "record": {
       "recordId": 8801,
-      "place": { },
-      "contexts": [ ],
+      "place": {},
+      "contexts": [],
       "keywords": []
     }
   }
@@ -758,7 +770,12 @@ POST /api/core/v1/search/records
 {
   "success": true,
   "data": {
-    "bounds": { "swLat": 37.4979, "swLng": 126.9270, "neLat": 37.5665, "neLng": 127.0557 },
+    "bounds": {
+      "swLat": 37.4979,
+      "swLng": 126.927,
+      "neLat": 37.5665,
+      "neLng": 127.0557
+    },
     "items": [
       {
         "recordId": 8801,
@@ -851,6 +868,15 @@ GET /api/core/v1/collections?cursor={cursor}&size=10
 이 Endpoint는 일반적인 내 Collection 관리 화면에서 사용한다.  
 Library 내 책장 세로 스크롤에서는 Library 전용 Endpoint를 사용한다.
 
+정렬:
+
+​`text
+Library 책장(Shelf) 노출: collection.created_at ASC (오래된순)
+​`
+
+Feed(추천 Collection 노출)는 이 정렬 기준을 따르지 않는다. 별도 정렬 기준을 명시하지 않는 한
+추천 로직에 따른 순서로 간주한다.
+
 ## 7.3 Collection 상세 통합 조회
 
 ```http
@@ -859,11 +885,11 @@ GET /api/core/v1/collections/{collectionId}?recordCursor={cursor}&recordSize=2
 
 Query:
 
-| 이름 | 필수 | 설명 |
-|---|---:|---|
-| `recordCursor` | X | 다음 CollectionRecord 커서 |
-| `recordSize` | X | 반환할 Record 수, 기본 1 |
-| `recordSort` | X | MVP에서는 `ADDED_AT_DESC` 고정 권장 |
+| 이름           | 필수 | 설명                                |
+| -------------- | ---: | ----------------------------------- |
+| `recordCursor` |    X | 다음 CollectionRecord 커서          |
+| `recordSize`   |    X | 반환할 Record 수, 기본 1            |
+| `recordSort`   |    X | MVP에서는 `ADDED_AT_DESC` 고정 권장 |
 
 정렬:
 
@@ -1154,7 +1180,11 @@ GET /api/core/v1/follows?cursor={cursor}&size=2
   "success": true,
   "data": {
     "items": [
-      { "followId": 701, "alias": "서울 카페", "createdAt": "2026-07-23T10:00:00Z" },
+      {
+        "followId": 701,
+        "alias": "서울 카페",
+        "createdAt": "2026-07-23T10:00:00Z"
+      },
       { "followId": 702, "alias": null, "createdAt": "2026-07-20T10:00:00Z" }
     ],
     "nextCursor": "opaque-cursor",
@@ -1257,7 +1287,7 @@ POST /api/core/v1/feed/events
   "requestId": "5b2c0000-0000-0000-0000-000000000000",
   "events": [
     { "event": "CLICK", "collectionId": 7001, "placeId": null, "position": 0 },
-    { "event": "SAVE",  "collectionId": 7001, "placeId": 5501, "position": 0 }
+    { "event": "SAVE", "collectionId": 7001, "placeId": 5501, "position": 0 }
   ]
 }
 ```
@@ -1382,17 +1412,17 @@ type CursorPage<T> = {
 
 # 12. 접근 권한표
 
-| 기능 | 본인 | 팔로우한 사용자 | 팔로우하지 않은 사용자 |
-|---|---:|---:|---:|
-| 공개 Collection 목록 조회 | O | O | O |
-| 공개 Collection 상세 조회 | O | O | O |
-| Record Place 조회 | O | O | O |
-| Record Keyword 조회 | O | O | O |
-| Record 생성일 조회 | O | O | O |
-| Record Context 원문 조회 | O | X, `null` | X, `null` |
-| Collection 제목·구성 수정 | 소유자만 | X | X |
-| Context 수정·삭제 | 소유자만 | X | X |
-| Follow 별칭 조회 | 지정한 본인만 | 해당 없음 | 해당 없음 |
+| 기능                      |          본인 | 팔로우한 사용자 | 팔로우하지 않은 사용자 |
+| ------------------------- | ------------: | --------------: | ---------------------: |
+| 공개 Collection 목록 조회 |             O |               O |                      O |
+| 공개 Collection 상세 조회 |             O |               O |                      O |
+| Record Place 조회         |             O |               O |                      O |
+| Record Keyword 조회       |             O |               O |                      O |
+| Record 생성일 조회        |             O |               O |                      O |
+| Record Context 원문 조회  |             O |       X, `null` |              X, `null` |
+| Collection 제목·구성 수정 |      소유자만 |               X |                      X |
+| Context 수정·삭제         |      소유자만 |               X |                      X |
+| Follow 별칭 조회          | 지정한 본인만 |       해당 없음 |              해당 없음 |
 
 ---
 
@@ -1524,10 +1554,10 @@ GET /collections/{collectionId}
 
 미확정 항목 없음. 주요 확정 내역:
 
-| 항목 | 확정 내용 |
-|---|---|
-| 인증 | JWT. Access 30분, Refresh 7일(Redis 저장, 회전 발급) |
-| 커서 | Base64(정렬키+id). `size` 기본 20, 명세상 상한 없음(서버 방어 상한 권장) |
-| Feed SAVE 이벤트 | 클라이언트가 저장 성공 후 `/feed/events`로 전송 |
-| `similarity` | 검색 응답에 항상 포함. UI 노출은 프론트 결정 |
-| Context 수정 응답 | `PATCH 200` (사용자 관점의 수정. 새 `contextId` 반환) |
+| 항목              | 확정 내용                                                                |
+| ----------------- | ------------------------------------------------------------------------ |
+| 인증              | JWT. Access 30분, Refresh 7일(Redis 저장, 회전 발급)                     |
+| 커서              | Base64(정렬키+id). `size` 기본 20, 명세상 상한 없음(서버 방어 상한 권장) |
+| Feed SAVE 이벤트  | 클라이언트가 저장 성공 후 `/feed/events`로 전송                          |
+| `similarity`      | 검색 응답에 항상 포함. UI 노출은 프론트 결정                             |
+| Context 수정 응답 | `PATCH 200` (사용자 관점의 수정. 새 `contextId` 반환)                    |
