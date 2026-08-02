@@ -19,8 +19,8 @@
 | FE | `VITE_API_BASE_URL` | 비민감 build variable | Front / repository variable | `dev` publish gate | — | Vite build → browser API client |
 | FE | `VITE_KAKAO_REST_KEY` | 비민감 공개 key | Front / repository variable | `dev` publish gate | — | Vite build → browser Kakao REST client |
 | FE | `VITE_KAKAO_JS_KEY` | 비민감 공개 key | Front / repository variable | `dev` publish gate | — | Vite build → browser Kakao Maps SDK |
-| FE | `DEPLOY_CANARY_REV` | 비민감 build identity | Front / repository variable | `dev` publish gate | — | Vite image identity/canary 검증 |
-| FE | `PINLOG_INFRA_IMAGE_PR_TOKEN` | 민감 공급망 token | Front / Actions Secret | `dev` | — | Front CI의 Infra image PR client |
+| FE | `DEPLOY_CANARY_REV` | 비민감 build identity | Front / `dev` Environment variable | `dev` publish gate | — | Vite image identity/canary 검증 |
+| FE | `PINLOG_INFRA_IMAGE_PR_TOKEN` | 민감 공급망 token | Front / repository Actions Secret | `dev` publish job gate (repository Secret 소비) | — | Front CI의 Infra image PR client |
 | BE | `JWT_PRIVATE_KEY` | 민감 runtime Secret | Back / Environment Secret | `pinlog-secrets-prod` | `infra/secrets/prod/back-owner-secrets.sealedsecret.yaml` | Spring `JwtKeyProvider` |
 | BE | `GOOGLE_CLIENT_ID` | 민감 runtime credential | Back / Environment Secret | `pinlog-secrets-prod` | 위와 같음 | Spring OAuth2 Google client |
 | BE | `GOOGLE_CLIENT_SECRET` | 민감 runtime Secret | Back / Environment Secret | `pinlog-secrets-prod` | 위와 같음 | Spring OAuth2 Google client |
@@ -44,7 +44,7 @@
 | AI | `PINLOG_EMBEDDING_DISTANCE` | 비민감 optional override | AI 설정 owner | `pinlog-secrets-dev` | 위와 같음 | FastAPI `Settings` |
 | AI | `PINLOG_EMBEDDING_PROFILE` | 비민감 optional override | AI 설정 owner | `pinlog-secrets-dev` | 위와 같음 | FastAPI `Settings` 및 BE/AI profile 대조 |
 | AI | `DATABASE_URL` | 민감 runtime Secret | AI DB credential owner | 별도 승인 전달 | `infra/secrets/dev/ai-db-credentials.sealedsecret.yaml` | FastAPI/Flyway-compatible DB client |
-| AI | `PINLOG_INFRA_IMAGE_PR_TOKEN` | 민감 공급망·Secret PR token | AI / Actions Secret | `pinlog-secrets-dev`(Secret 봉인), 일반 CI(image PR) | — | AI CI 및 SealedSecret Infra PR action |
+| AI | `PINLOG_INFRA_IMAGE_PR_TOKEN` | 민감 공급망·Secret PR token | AI / repository Actions Secret | `pinlog-secrets-dev` seal job gate (repository Secret 소비), 일반 CI(image PR) | — | AI CI 및 SealedSecret Infra PR action |
 | Infra | `PINLOG_IMAGE_UPDATER_TOKEN` | 민감 공급망 token | Infra / Actions Secret | 없음 | — | Backend·Frontend source/run/GHCR 검증과 Infra PR |
 | Infra | `PINLOG_IMAGE_UPDATER_USERNAME` | 비민감 공급망 variable | Infra / repository variable | 없음 | — | Backend·Frontend GHCR digest 검증 |
 | Infra | `PINLOG_AI_SOURCE_READER_TOKEN` | 민감 read token | Infra / Actions Secret | 없음 | — | AI source CI/GHCR provenance 검증 |
