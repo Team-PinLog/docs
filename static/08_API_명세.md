@@ -1216,7 +1216,9 @@ GET /api/core/v1/follows?cursor={cursor}&size=10&collectionSize=5
 - `collections`의 항목 형태는 9.3과 같다.
 - `collections.nextCursor`는 **그 책장 전용**이며 9.3 Endpoint에 그대로 넣어 이어받는다. 바깥 `nextCursor`(팔로우 축)와 섞지 않는다.
 - Collection이 없는 책장도 항목으로 나오며 `collections.items`가 빈 배열이다.
-- `collectionSize`를 주지 않으면 `collections` 필드 자체가 없다. 기존 호출은 영향받지 않는다.
+- `collectionSize`를 주지 않으면 `collections` 필드 자체가 없다. 기존 호출은 영향받지 않는다. `size` 기본값도 1.4(20) 그대로다 — `collectionSize`가 있다고 달라지지 않는다.
+- `size`·`collectionSize`에 0 이하나 상한 초과 값을 주면 400이 아니라 서버가 범위 안으로 보정한다.
+- 첫 화면 권장 호출은 `size=10`·`collectionSize=5`(합계 최대 50행)다. 화면의 줄 수·표지 수에 맞춰 값을 바꾸면 된다.
 - 서버는 페이지 전체의 Collection을 **한 번의 질의로** 모은다. 책장 수만큼 질의하지 않는다.
 
 ## 9.3 팔로우 책장의 Collection 목록
