@@ -79,7 +79,7 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 - 인코딩: **Base64(정렬키 + id)**. 예: `Base64("2026-07-23T10:00:00Z,8801")`.
 - `size` 기본 20, 명세상 상한 없음. 단, 구현 시 서버 내부 방어 상한을 두는 것을 권장한다.
 
-정렬 방향 파라미터(7.2·7.3·9.3·5.2)를 두는 목록에서 **커서는 발급받은 방향에서만 유효하다.** 방향을 바꿀 때는 커서 없이 첫 페이지부터 다시 요청한다. 서버는 커서와 방향의 불일치를 검증하지 않으므로(알려진 한계, back BD-46), 다른 방향에서 받은 커서를 넣으면 오류 없이 어긋난 페이지가 반환된다. 정렬 파라미터는 사용자 노출 토글이 아니라 **프론트가 상수로 고정해 보내는 값**이며, 이 전제가 깨지는 기능(정렬 토글 UI)을 붙이려면 커서 방향 검증이 선행돼야 한다.
+정렬 방향 파라미터(7.2·7.3·8.1·9.2·9.3·5.2)를 두는 목록에서 **커서는 발급받은 방향에서만 유효하다.** 방향을 바꿀 때는 커서 없이 첫 페이지부터 다시 요청한다. 서버는 커서와 방향의 불일치를 검증하지 않으므로(알려진 한계, back BD-46), 다른 방향에서 받은 커서를 넣으면 오류 없이 어긋난 페이지가 반환된다. 정렬 파라미터는 사용자 노출 토글이 아니라 **프론트가 상수로 고정해 보내는 값**이며, 이 전제가 깨지는 기능(정렬 토글 UI)을 붙이려면 커서 방향 검증이 선행돼야 한다.
 
 ## 1.5 공통 에러 형식
 
@@ -1043,12 +1043,14 @@ DELETE /api/core/v1/collections/{collectionId}/records/{recordId}
 ## 8.1 최초 공개 책장 탐색
 
 ```http
-GET /api/core/v1/feed/collections/{collectionId}/shelf?cursor={cursor}&size=20
+GET /api/core/v1/feed/collections/{collectionId}/shelf?cursor={cursor}&size=20&sort=CREATED_AT_ASC
 ```
 
 `collectionId`를 공개 진입점으로 사용해 해당 Collection 작성자의 다른 공개 Collection을 조회한다.
 
 `size`는 공통 커서 계약을 따른다 — 기본값 `CursorPage.DEFAULT_SIZE`(20), 서버 방어 상한 `CursorPage.MAX_SIZE`(100), 범위 밖 값은 `CursorPage.normalizeSize`가 보정한다. 같은 Feed 네임스페이스의 `GET /feed/collections`와 기본 크기를 맞춘다.
+
+정렬은 7.2와 같다 — 기본 `collection.created_at ASC`(오래된순), `sort=CREATED_AT_DESC`로 최신순. 같은 작성자의 발행 Collection 조회를 9.3과 공유하므로 규칙도 같이 간다.
 
 응답:
 
@@ -1216,13 +1218,14 @@ GET /api/core/v1/follows?cursor={cursor}&size=2
 ### 책장별 Collection 함께 받기 — `collectionSize`
 
 ```http
-GET /api/core/v1/follows?cursor={cursor}&size=10&collectionSize=5
+GET /api/core/v1/follows?cursor={cursor}&size=10&collectionSize=5&collectionSort=CREATED_AT_ASC
 ```
 
 | 파라미터 | 필수 | 설명 |
 |---|:---:|---|
 | `cursor`·`size` | X | **팔로우 축**. 공통 커서 계약(1.4)을 따른다 |
 | `collectionSize` | X | **각 책장의 Collection 축**. 주면 항목마다 `collections`가 실린다. 없으면 위 기본 응답과 같다 |
+| `collectionSort` | X | 동봉 `collections`의 정렬. `CREATED_AT_ASC`(기본) 또는 `CREATED_AT_DESC`. 팔로우 축 정렬(최신순)에는 영향이 없다 |
 
 중첩 축에 접두어를 붙이는 것은 7.3(`recordCursor`·`recordSize`)과 같은 규약이다. 바깥 축은 이 Endpoint가 돌려주는 자기 축이므로 접두어 없이 `cursor`·`size`를 쓴다.
 
@@ -1257,7 +1260,7 @@ GET /api/core/v1/follows?cursor={cursor}&size=10&collectionSize=5
 ```
 
 - `collections`의 항목 형태는 9.3과 같다.
-- `collections.nextCursor`는 **그 책장 전용**이며 9.3 Endpoint에 그대로 넣어 이어받는다. 바깥 `nextCursor`(팔로우 축)와 섞지 않는다.
+- `collections.nextCursor`는 **그 책장 전용**이며 9.3 Endpoint에 그대로 넣어 이어받는다. 바깥 `nextCursor`(팔로우 축)와 섞지 않는다. `collectionSort`를 바꿔 받았다면 9.3에도 같은 방향의 `sort`를 줘야 이어진다(1.4).
 - Collection이 없는 책장도 항목으로 나오며 `collections.items`가 빈 배열이다.
 - `collectionSize`를 주지 않으면 `collections` 필드 자체가 없다. 기존 호출은 영향받지 않는다. `size` 기본값도 1.4(20) 그대로다 — `collectionSize`가 있다고 달라지지 않는다.
 - `size`·`collectionSize`에 0 이하나 상한 초과 값을 주면 400이 아니라 서버가 범위 안으로 보정한다.
