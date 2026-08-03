@@ -776,6 +776,7 @@ POST /api/core/v1/search/records
           "createdAt": "2026-07-23T10:00:00Z"
         },
         "keywords": ["친구", "비 오는 날"],
+        "keywordStatus": "COMPLETED",
         "createdAt": "2026-07-20T09:00:00Z"
       }
     ]
@@ -786,6 +787,29 @@ POST /api/core/v1/search/records
 - `bounds`는 검색 결과 Record들의 Place 전체를 포함하는 최소 사각형이다(4.2와 동일 규칙: 결과 없으면 `null`). 프론트는 검색 결과를 지도에 띄울 때 `fitBounds(bounds, padding)`을 사용한다.
 - `keywords`는 매칭된 Context의 Keyword가 아니라 **해당 Record의 활성 Context 전체 Keyword 집계값**이다(`ai.context_keyword`를 Record 단위로 집계, 중복 제거).
 - `keywords`는 `keyword_preset`의 `display_name` 문자열 배열이다. `code`는 내부 식별용으로 노출하지 않는다(모든 Keyword 응답 공통). 지역·Place 카테고리(예: "카페")는 프리셋에 없으므로 Keyword로 나올 수 없다.
+- `keywordStatus`는 그 Record의 **Keyword 판정 상태**다. **항상 반환하며 `null`이 아니다.** `keywords`가 빈 배열일 때 그것이 최종인지 아닌지를 이 값 하나로 가른다.
+
+#### `keywordStatus`
+
+| 값 | 뜻 | 화면 |
+|---|---|---|
+| `COMPLETED` | 판정이 끝났다. `keywords`가 최종이다 | 0건이면 "이 기록엔 키워드가 없어요" |
+| `PROCESSING` | 아직 처리 중이다. 기다리면 채워진다 | "분석 중"이 사실인 유일한 경우 |
+| `FAILED` | 처리가 끝내 실패했다. 기다려도 오지 않는다 | 재시도·문의 유도 |
+
+**프론트가 분기해야 하는 것은 `PROCESSING` 하나다.** 나머지 둘은 `keywords`를 그대로 그리면 된다. **필드를 읽지 않아도 기존 동작과 같다** — `keywords`의 의미와 값은 이 필드가 생기기 전과 동일하다.
+
+세 값은 AI 파트의 내부 상태(`ai.context_ai_state.keyword_status`, 5값)를 그대로 내보낸 것이 아니라 **응답용으로 접은 값**이다. 사용자에게 필요한 판단이 「기다리면 오는가」 하나이기 때문이다. Record 하나에 활성 Context가 여럿일 수 있어 Record 단위로 접으며, 규칙과 근거는 AI 파트 명세가 원본이다([back `docs/ai/spec/ai-response-assembly.md` §5.1](https://github.com/Team-PinLog/back/blob/dev/docs/ai/spec/ai-response-assembly.md)).
+
+```text
+활성 Context 중 하나라도 처리 중   →  PROCESSING   (그것이 끝나면 Keyword가 더 붙는다)
+그렇지 않고 하나라도 실패          →  FAILED
+그 밖                              →  COMPLETED
+```
+
+`PROCESSING`은 무한히 지속되지 않는다. 재스캔이 만료된 처리 중 상태를 `FAILED`로 전이시키므로 화면의 "분석 중"에는 상한이 있다.
+
+**다른 응답에는 이 필드가 없다.** 검색은 소유자 전용 응답이라 자기 기록의 처리 상태를 봐도 되지만, 타인 응답(공개 Collection·책장·타인 Record 카드)에 실으면 남의 AI 처리 진행 상황이 새어 나간다. 그쪽 `keywords`는 종전대로 빈 배열이 최종인지 아닌지를 구분하지 않는다.
 
 ### 검색 결과 카드 요구사항
 
@@ -1570,7 +1594,7 @@ GET /collections/{collectionId}
 13. 내부 사용자 ID와 신원 정보는 공개 응답에 포함하지 않는다.
 14. 모든 조회에서 소프트 삭제 데이터를 제외한다.
 15. Context 추가·수정 시 `records.updated_at`을 갱신한다(최신 활동 시각 기록).
-16. 검색 응답 `keywords`는 Record의 활성 Context 전체 Keyword 집계값이다.
+16. 검색 응답 `keywords`는 Record의 활성 Context 전체 Keyword 집계값이며, 그 배열이 최종인지 여부는 같은 응답의 `keywordStatus`가 가른다(6.1).
 17. 연쇄 삭제가 발생하는 삭제 요청은 409로 거절하고, 프론트 확인 후 강제 삭제 API(`/records/{recordId}/force`) 또는 Collection 삭제 API로만 수행한다.
 
 ---
@@ -1585,4 +1609,5 @@ GET /collections/{collectionId}
 | 커서 | Base64(정렬키+id). `size` 기본 20, 명세상 상한 없음(서버 방어 상한 권장) |
 | Feed SAVE 이벤트 | 클라이언트가 저장 성공 후 `/feed/events`로 전송 |
 | `similarity` | 검색 응답에 항상 포함. UI 노출은 프론트 결정 |
+| `keywordStatus` | 검색 응답에만 포함하며 항상 반환. `COMPLETED`·`PROCESSING`·`FAILED` 셋(6.1) |
 | Context 수정 응답 | `PATCH 200` (사용자 관점의 수정. 새 `contextId` 반환) |
