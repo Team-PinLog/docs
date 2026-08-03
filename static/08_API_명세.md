@@ -79,6 +79,8 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 - 인코딩: **Base64(정렬키 + id)**. 예: `Base64("2026-07-23T10:00:00Z,8801")`.
 - `size` 기본 20, 명세상 상한 없음. 단, 구현 시 서버 내부 방어 상한을 두는 것을 권장한다.
 
+정렬 방향 파라미터(7.2·7.3·9.3·5.2)를 두는 목록에서 **커서는 발급받은 방향에서만 유효하다.** 방향을 바꿀 때는 커서 없이 첫 페이지부터 다시 요청한다. 서버는 커서와 방향의 불일치를 검증하지 않으므로(알려진 한계, back BD-46), 다른 방향에서 받은 커서를 넣으면 오류 없이 어긋난 페이지가 반환된다. 정렬 파라미터는 사용자 노출 토글이 아니라 **프론트가 상수로 고정해 보내는 값**이며, 이 전제가 깨지는 기능(정렬 토글 UI)을 붙이려면 커서 방향 검증이 선행돼야 한다.
+
 ## 1.5 공통 에러 형식
 
 ```json
@@ -561,10 +563,16 @@ POST /api/core/v1/records
 ## 5.2 Record 상세
 
 ```http
-GET /api/core/v1/records/{recordId}
+GET /api/core/v1/records/{recordId}?contextSort=CREATED_AT_ASC
 ```
 
-본인 소유 Record만 조회한다. `contexts`는 배열이며, `createdAt`(최초 작성 시각) 오름차순 — 오래된 것부터 — 으로 정렬된다. 모든 `contexts` 배열 응답에 공통이다.
+Query:
+
+| 이름 | 필수 | 설명 |
+|---|---:|---|
+| `contextSort` | X | `CREATED_AT_ASC`(기본, 오래된순) 또는 `CREATED_AT_DESC`. 프론트가 상수로 고정해 보낸다(1.4) |
+
+본인 소유 Record만 조회한다. `contexts`는 배열이며, 기본은 `createdAt`(최초 작성 시각) 오름차순 — 오래된 것부터 — 이다. Collection 상세(7.3) 안의 `records[].contexts`는 파라미터 없이 항상 오름차순이다.
 
 ## 5.3 장소로 내 Record 조회
 
@@ -869,11 +877,20 @@ POST /api/core/v1/collections
 ## 7.2 내 Collection 목록
 
 ```http
-GET /api/core/v1/collections?cursor={cursor}&size=10
+GET /api/core/v1/collections?cursor={cursor}&size=10&sort=CREATED_AT_ASC
 ```
 
-이 Endpoint는 일반적인 내 Collection 관리 화면에서 사용한다.  
-Library 내 책장 세로 스크롤에서는 Library 전용 Endpoint를 사용한다.
+Query:
+
+| 이름 | 필수 | 설명 |
+|---|---:|---|
+| `sort` | X | `CREATED_AT_ASC`(기본, 오래된순) 또는 `CREATED_AT_DESC`. 프론트가 상수로 고정해 보낸다(1.4) |
+
+정렬 기본은 `collection.created_at ASC`(오래된순), 동률이면 `id ASC`다.
+
+이 Endpoint는 내 Collection 관리 화면과 Library 내 책장 세로 스크롤에서 함께 사용한다. Library 전용 Endpoint는 없다(2.6·9.1·14장 5번).
+
+Feed(추천 Collection 노출)는 이 정렬 기준과 무관하다 — 추천 정렬은 Feed 파트가 별도로 정한다.
 
 ## 7.3 Collection 상세 통합 조회
 
@@ -887,13 +904,15 @@ Query:
 |---|---:|---|
 | `recordCursor` | X | 다음 CollectionRecord 커서 |
 | `recordSize` | X | 반환할 Record 수, 기본 1 |
-| `recordSort` | X | MVP에서는 `ADDED_AT_DESC` 고정 권장 |
+| `recordSort` | X | `ADDED_AT_ASC`(기본, 담은 순서 오래된순) 또는 `ADDED_AT_DESC`. 프론트가 상수로 고정해 보낸다(1.4) |
 
 정렬:
 
 ```text
-collection_records.created_at DESC
+collection_records.created_at ASC (기본), 동률이면 id ASC
 ```
+
+각 Record 안의 `contexts`는 `recordSort`와 무관하게 항상 `createdAt` 오름차순이다(5.2).
 
 ### 소유자 조회 응답
 
@@ -1248,8 +1267,10 @@ GET /api/core/v1/follows?cursor={cursor}&size=10&collectionSize=5
 ## 9.3 팔로우 책장의 Collection 목록
 
 ```http
-GET /api/core/v1/follows/{followId}/collections?cursor={cursor}&size=6
+GET /api/core/v1/follows/{followId}/collections?cursor={cursor}&size=6&sort=CREATED_AT_ASC
 ```
+
+정렬은 7.2와 같다 — 기본 `collection.created_at ASC`(오래된순), `sort=CREATED_AT_DESC`로 최신순.
 
 검증:
 
@@ -1268,7 +1289,7 @@ GET /api/core/v1/collections/{collectionId}?recordCursor={cursor}&recordSize=2
 - 모바일 한 페이지에 Record 하나: `recordSize=1`
 - 웹 펼친 책의 양쪽 페이지: `recordSize=2`
 - 다음 페이지 이동 시 응답의 `records.nextCursor` 사용
-- 정렬은 `collection_records.created_at DESC`
+- 정렬은 `collection_records.created_at ASC`(기본, 담은 순서 오래된순). `recordSort=ADDED_AT_DESC`로 최신순(7.3)
 
 ---
 
@@ -1586,7 +1607,7 @@ GET /collections/{collectionId}
 5. Library는 전용 Endpoint 없이 `GET /collections` + `GET /follows` + `GET /follows/{followId}/collections` 조합으로 구성한다.
 6. 팔로우 목록 커서와 각 책장 Collection 커서를 혼용하지 않는다.
 7. 내 책장은 `GET /collections`로 프론트가 별도 구성·유지한다.
-8. Collection 내부 Record는 `collection_records.created_at DESC`(최신 담은 순)로 정렬한다.
+8. Collection 내부 Record는 `collection_records.created_at ASC`(담은 순서 오래된순)를 기본으로 정렬하고, `recordSort=ADDED_AT_DESC`로 최신순을 지원한다. Collection 목록(7.2·9.3)도 같은 방식이다 — 기본 오래된순, `sort` 파라미터로 최신순.
 9. AI 검색 결과에 `matchedContext.body`, `recordId`, `contextId`를 제공한다.
 10. Record·Context 생성 직후 `keywords: []`를 정상 상태로 취급한다.
 11. Feed IMPRESSION은 목록 응답 생성 시 서버가 기록한다.
