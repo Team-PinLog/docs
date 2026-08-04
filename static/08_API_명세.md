@@ -1521,6 +1521,27 @@ type RecordDetail = {
 타인 공개 Collection 조회 → contexts = null
 ```
 
+`PlaceSummary`:
+
+```typescript
+type PlaceSummary = {
+  placeId: number;
+  kakaoPlaceId: string;
+  name: string;
+  address: string;
+  roadAddress: string | null;
+  phone: string | null;
+  placeUrl: string | null;
+  thumbnailUrl: string | null;
+  lat: number;
+  lng: number;
+};
+```
+
+- `thumbnailUrl`은 장소 대표 썸네일 이미지 URL이다. 없으면 `null`이며 필드를 생략하지 않는다 — 프론트는 `null`이거나 이미지 로드에 실패하면 기본 이미지로 폴백한다.
+- 이미지는 **4:3 비율**로 제공된다. 프론트는 `aspect-ratio: 4 / 3` + `object-fit: cover`로 표시하면 로딩 전 영역이 확보되고 모바일·PC 폭 모두에 적응한다.
+- 현 단계 값은 같은 origin의 절대 경로(`/api/core/images/places/…`)다. 이후 외부 절대 URL로 바뀔 수 있으며 `<img src>` 사용법은 동일하다.
+
 ## 11.2 `ContextDetail`
 
 ```typescript
