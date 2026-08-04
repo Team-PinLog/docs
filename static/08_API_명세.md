@@ -556,7 +556,7 @@ Query:
   "data": {
     "bounds": { "swLat": 37.4979, "swLng": 126.9270, "neLat": 37.5665, "neLng": 127.0557 },
     "items": [
-      { "recordId": 8801, "placeId": 5501, "name": "앤트러사이트 성수", "lat": 37.5447, "lng": 127.0557 }
+      { "recordId": 8801, "placeId": 5501, "name": "앤트러사이트 성수", "lat": 37.5447, "lng": 127.0557, "latestCollectionId": 7001 }
     ]
   }
 }
@@ -564,6 +564,7 @@ Query:
 
 - `bounds`는 반환된 마커 전체를 포함하는 **최소 사각형**이다. 프론트는 최초 진입 시 `fitBounds(bounds, padding)`으로 모든 마커가 한눈에 보이는 최소 화면(여유 포함)을 만든다.
 - 결과가 없으면 `bounds: null`, 1개면 해당 좌표의 점 사각형(sw = ne)이다.
+- `latestCollectionId`는 그 Record가 **가장 최근에 담긴** Collection의 id다(마커 색상 구분용). "가장 최근"은 컬렉션 내부 정렬과 같은 담은 시각 기준이며, 어느 Collection에도 담기지 않은 Record는 `null`이다. 컬렉션에서 뺀(삭제된) 연결은 판단에서 제외된다.
 
 ## 4.3 발견한 Place 저장
 
