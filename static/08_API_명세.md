@@ -455,7 +455,7 @@ WHERE context_id = ?;
 ## 4.2 내 Record 지도
 
 ```http
-GET /api/core/v1/records/map?swLat={swLat}&swLng={swLng}&neLat={neLat}&neLng={neLng}
+GET /api/core/v1/records/map?swLat={swLat}&swLng={swLng}&neLat={neLat}&neLng={neLng}&keyword={keyword}
 ```
 
 Query:
@@ -466,10 +466,14 @@ Query:
 | `swLng` | X | 남서 경도 |
 | `neLat` | X | 북동 위도 |
 | `neLng` | X | 북동 경도 |
+| `keyword` | X | 장소명·주소 부분 일치 검색어 |
 
 - bbox 파라미터 없이 호출하면(최초 진입) 내 **전체** 마커를 반환한다.
 - bbox를 주면 해당 범위의 마커만 반환한다(지도 이동 시).
+- `keyword`를 주면 장소명(`name`) **또는** 주소(`address`)에 검색어가 부분 일치(대소문자 무시)하는 마커만 반환한다. 생략하거나 빈 문자열·공백뿐이면 필터하지 않는다. `%`·`_`는 와일드카드가 아니라 문자 그대로 검색된다.
+- `keyword`는 bbox와 독립적으로 조합할 수 있다(AND). bbox의 "모두 주거나 모두 생략" 규칙에 `keyword`는 포함되지 않는다.
 - 응답은 현재 로그인 사용자의 활성 Record와 연결된 Place만 포함한다.
+- `items`는 장소명 오름차순(동명이면 `recordId` 오름차순)으로 정렬된다.
 
 ```json
 {
