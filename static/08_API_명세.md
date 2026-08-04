@@ -1603,6 +1603,19 @@ GET /collections/{collectionId}
 
 위와 동일하게 5.6을 그대로 호출한다. 마지막 Context 삭제 시 409 `DELETE_CONFIRMATION_REQUIRED` 처리도 레코드 상세와 동일하다.
 
+## 13.11 컬렉션 만들기에서 담을 장소 검색
+
+컬렉션에 담을 장소 선택 화면은 별도 목록 API 없이 4.2를 목록으로 재사용한다.
+
+```text
+GET /records/map                     -- 최초 진입: 내 전체 장소
+GET /records/map?keyword={검색어}     -- 검색어 입력 시
+→ items에서 장소 선택
+→ POST /collections { title, recordIds } (7.1)
+```
+
+지도 화면이 아니므로 `bounds`는 사용하지 않고 `items`만 사용한다. `items`는 장소명 오름차순이라 그대로 목록에 그리면 된다.
+
 ---
 
 # 14. 구현 시 반드시 지킬 사항
