@@ -1134,7 +1134,7 @@ DELETE /api/core/v1/collections/{collectionId}/records/{recordId}
 
 ## 7.7 표지 이미지
 
-Collection 표지는 AI 파트의 이미지 서비스(`/image/api/*`, 연동 계약은 front#99 가이드)가 생성하고, **core는 최종본 URL만 저장한다.** 전체 플로우는 프론트가 오케스트레이션한다 — 화풍 6종 중 사용자가 하나를 고르는 UI 단계가 있어 서버가 뒤에서 대신할 수 없다.
+Collection 표지는 이미지 서비스(INFRA 소유 `Team-PinLog/image`, `/image/api/*`, 연동 계약은 front#99 가이드)가 생성하고, **core는 최종본 URL만 저장한다.** 전체 플로우는 프론트가 오케스트레이션한다 — 화풍 6종 중 사용자가 하나를 고르는 UI 단계가 있어 서버가 뒤에서 대신할 수 없다.
 
 ```text
 POST /collections { title, recordIds }        -- 표지 없이 즉시 생성 (7.1)
@@ -1151,7 +1151,7 @@ POST /collections { title, recordIds }        -- 표지 없이 즉시 생성 (7.
 - `coverImageUrl`은 Collection이 실리는 모든 응답에 포함된다 — 생성(7.1)·상세(7.3)·책장 탐색(8.1)·팔로우 책장(9.2·9.3)·Feed(10.1). **`null`이어도 필드를 생략하지 않는다.** 프론트는 `null`이거나 이미지 로드에 실패하면 기본 표지로 폴백한다.
 - 이미지는 **세로형 2:3 비율**(미리보기 512×768 WebP)이다. `aspect-ratio: 2 / 3` + `object-fit: cover`로 표시하면 로딩 전 영역이 확보된다.
 - 사용자가 화풍을 고르기 전에 이탈하면 표지 없는 Collection이 남는다. 오류가 아니라 정상 상태이며, 표지는 이후 언제든 7.4로 등록·교체할 수 있다. 프론트는 재등록 진입점을 제공한다.
-- 원본 파일의 보관·서빙은 이미지 서비스 책임이다. **이미지 서비스의 파일 보존 정책이 확정되기 전에는 이 절의 계약이 잠정이다**(파트간 요구사항 §3.1).
+- 원본 파일의 보관·서빙은 이미지 서비스 책임이다. 파일은 영속 볼륨에 남고 정리 배치가 없어 URL 참조가 유지된다(파트간 요구사항 §3.1). 파일이 사라지면 표지가 깨진 링크가 되므로, 이미지 서비스가 정리 정책을 도입할 때는 이 계약을 먼저 확인해야 한다.
 
 ---
 
@@ -1791,9 +1791,7 @@ POST /collections { title, recordIds } (7.1)   -- 즉시 생성, coverImageUrl: 
 
 # 15. 확정된 구현 세부사항
 
-미확정 항목 1건 — **표지 이미지 파일 보존 정책**(7.7). `coverImageUrl`은 이미지 서비스 파일의 URL 참조라 보존 정책이 확정되어야 계약이 완결된다(파트간 요구사항 §3.1, AI 파트 확인 대기).
-
-주요 확정 내역:
+미확정 항목 없음. 주요 확정 내역:
 
 | 항목 | 확정 내용 |
 |---|---|
@@ -1803,3 +1801,4 @@ POST /collections { title, recordIds } (7.1)   -- 즉시 생성, coverImageUrl: 
 | `similarity` | 검색 응답에 항상 포함. UI 노출은 프론트 결정 |
 | `keywordStatus` | 검색 응답에만 포함하며 항상 반환. `COMPLETED`·`PROCESSING`·`FAILED` 셋(6.1) |
 | Context 수정 응답 | `PATCH 200` (사용자 관점의 수정. 새 `contextId` 반환) |
+| Collection 표지 | core는 URL만 저장(7.7). 등록·교체만 있고 제거는 없다. 생성은 표지를 기다리지 않으며 `coverImageUrl`은 `null` 허용 |
