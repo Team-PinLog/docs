@@ -517,6 +517,67 @@ WHERE context_id = ?;
 - 활성 `social_account`가 사라지므로, 같은 소셜 계정으로 다시 로그인하면 **신규 회원으로 가입**된다(3.2). 과거 데이터는 복구되지 않는다.
 - 연결이 해제됐으므로 그 재로그인은 **공급자 동의 절차를 다시 거친다.** 이것이 3.6.3의 순서가 보장하는 결과다.
 
+## 3.7 나의 활동 기록 집계
+
+```http
+GET /api/core/v1/me/activity
+```
+
+내 기록을 월별·지역별로 집계한다. 활동 기록 화면 진입 시 1회 호출한다.
+
+**기간은 전체 누적이다.** 기간 파라미터를 두지 않는다 — 화면이 "지금까지"를 보여주는 자리라 범위를 고를 여지가 없다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "totals": {
+      "placeCount": 24,
+      "districtCount": 7,
+      "firstRecordedOn": "2026-01-14"
+    },
+    "months": [
+      { "month": "2026-01", "recordCount": 2 },
+      { "month": "2026-02", "recordCount": 0 },
+      { "month": "2026-03", "recordCount": 5 }
+    ],
+    "areas": [
+      { "district": "마포구", "recordCount": 8 },
+      { "district": "성동구", "recordCount": 5 }
+    ],
+    "counts": {
+      "contextCount": 31,
+      "collectionCount": 5,
+      "recordedMonthCount": 7
+    },
+    "highlights": {
+      "firstPlaceName": "성수 앤트러사이트",
+      "lastPlaceName": "연남 커피리브레",
+      "busiestDay": { "date": "2026-05-17", "recordCount": 3 }
+    }
+  }
+}
+```
+
+**날짜 경계는 전부 KST다.** `record.created_at`은 `TIMESTAMPTZ`이므로 UTC로 끊으면 KST 자정 직후에 남긴 기록이 전날에 붙는다. 월·일 집계는 모두 KST 벽시계 기준으로 계산한다.
+
+| 필드 | 의미 |
+|---|---|
+| `totals.placeCount` | 기록한 장소 수. 활성 Record 수와 같다([06 §4.1](06_데이터모델_및_무결성.md) 회원·장소당 활성 Record 1개) |
+| `totals.districtCount` | 발자국이 닿은 시·구 수 |
+| `totals.firstRecordedOn` | 첫 기록일(KST). 기록이 없으면 `null` |
+| `months` | 첫 기록이 있는 달부터 **이번 달까지** 빠짐없이 이어진다. 기록이 없는 달은 `recordCount: 0`으로 채워진다 |
+| `areas` | 건수 내림차순 **상위 5곳**. 동점은 지역명 오름차순으로 끊는다 |
+| `counts.recordedMonthCount` | 기록이 **실제로 있는** 달의 수. `months`의 길이와 다르다 — 그쪽은 빈 달까지 채운 구간 길이다 |
+| `highlights.busiestDay` | 하루에 가장 많이 기록한 날(KST). 동점이면 더 최근 날짜다 |
+
+- 카운트는 모두 활성 데이터 기준 집계다. 소프트 삭제된 Record·Context·Collection은 빠진다.
+- **`areas`의 시·구는 `place.address` 문자열에서 뽑는다.** 행정구역 컬럼이 없어 주소를 공백으로 끊은 두 번째 조각을 쓰므로, 도로명·지번이 섞이거나 형식을 벗어난 주소에서는 정확하지 않다. 조각을 뽑을 수 없는 주소는 `areas`와 `districtCount` 양쪽에서 제외된다.
+- **기록이 하나도 없으면 `200`이다.** `months`·`areas`는 빈 배열, 카운트는 `0`, `firstRecordedOn`과 `highlights`의 세 값은 `null`이다. 404가 아니다.
+- AI 키워드는 담지 않는다. 키워드 집계는 4.3(지도 범위의 내 키워드 상위 5건)을 쓴다.
+- `memberId`는 반환하지 않는다(1.1).
+- 3.5(마이페이지 요약)를 대체하지 않는다. 그쪽은 계정 정보와 카운트 넷이고 이쪽은 집계라, 호출 시점과 응답 크기가 다르다.
+
 ---
 
 # 4. Place·지도 상세
