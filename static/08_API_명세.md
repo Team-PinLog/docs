@@ -222,6 +222,7 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 | GET | `/records/{recordId}` | 내 Record 상세 조회 |
 | GET | `/records/by-place` | kakaoPlaceId로 이 장소의 내 활성 Record 조회 |
 | GET | `/records/recent` | 최근 7일 안에 만든 내 Record 목록 (홈 화면 최근 기록) |
+| GET | `/records/{recordId}/collections` | 이 Record가 담긴 내 Collection 목록 (Record 상세 화면) |
 | DELETE | `/records/{recordId}` | Record 소프트 삭제. 마지막 Record인 Collection이 있으면 409 거절 |
 | DELETE | `/records/{recordId}/force` | 안내 확인 후 Record 강제 삭제. 연쇄 Collection 삭제 포함 |
 | POST | `/records/{recordId}/contexts` | Context 추가 |
@@ -916,6 +917,51 @@ Query:
 - `keywords`는 소유자 범위(`PUBLIC` + `PRIVATE_ONLY`) 집계이며, 없으면 `null`이 아니라 빈 배열이다. **AI 판정 전과 "키워드 0건"을 구분하지 않는다** — 6.1의 `keywordStatus`를 여기서는 제공하지 않으므로, 갓 만든 Record는 화면에 키워드 없이 그려진다.
 - 7일 안에 Record가 없으면 `items: []`인 200이다. 404가 아니다.
 - 페이징 도중 7일 경계는 요청마다 다시 계산된다. 커서를 오래 쥐고 있다가 다음 페이지를 부르면 경계에 걸친 항목이 빠질 수 있으나, 최신순이라 **이미 받은 항목이 다시 오지는 않는다.**
+
+## 5.10 Record가 담긴 내 Collection 목록
+
+```http
+GET /api/core/v1/records/{recordId}/collections?cursor={cursor}&size=20&sort=CREATED_AT_ASC
+```
+
+Record 상세 화면에서 "이 기록이 담긴 내 책" 목록을 Collection 카드로 보여줄 때 쓴다. **본인 소유 Record만** 대상이다.
+
+Query:
+
+| 이름 | 필수 | 설명 |
+|---|---:|---|
+| `cursor` | X | 1.4의 불투명 커서. 없으면 첫 페이지 |
+| `size` | X | 1.4의 공통 규칙. 기본 20, 서버 방어 상한 100 |
+| `sort` | X | `CREATED_AT_ASC`(기본, 오래된순) 또는 `CREATED_AT_DESC`. 7.2와 같은 규칙 |
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "collectionId": 41,
+        "title": "비 오는 날 카페",
+        "recordCount": 7,
+        "keywords": ["조용한", "디저트"],
+        "coverImageUrl": "/image/files/3f2a9c1e-8d4b-4f6a-9c0e-5b7d2e8a1c44_image_0.webp",
+        "publishedAt": "2026-08-01T02:11:07Z",
+        "createdAt": "2026-08-01T02:11:07Z"
+      }
+    ],
+    "nextCursor": "MjAyNi0wOC0wMVQwMjoxMTowN1osNDE",
+    "hasNext": true
+  }
+}
+```
+
+- **정렬 기준은 Collection의 생성 시각이다**(7.2와 같음). 그 Record를 담은 시각이 아니다 — 사용자가 책장에서 보던 순서가 여기서도 유지된다. 같은 시각은 `collectionId`로 끊는다.
+- 어느 Collection에도 담기지 않은 Record는 `items: []`인 200이다. 404가 아니다.
+- 없는 `recordId`와 **타인의 `recordId`는 모두 404**다. 존재 여부를 응답으로 구분하지 않는다(5.2와 같은 규약).
+- `keywords`는 Collection 단위 `PUBLIC` 집계이며 없으면 `null`이 아니라 빈 배열이다. 내 목록이지만 **남이 보는 표지와 같은 글자**를 싣는다. AI 판정 전과 "키워드 0건"을 구분하지 않는다(10.1과 같은 계약).
+- `coverImageUrl`은 `null`이어도 필드를 생략하지 않는다(7.7).
+- **목록 길이에 상한이 없다.** 한 Record가 담길 수 있는 Collection 수에는 제한이 없으므로(1.9의 상한은 요청 1회의 배열 크기다) 프론트는 커서를 끝까지 따라갈 수 있어야 한다.
+- 이 목록은 추천이 아니라 내 데이터 조회다. `requestId`·`position`이 없으며 **Feed 이벤트(10.2)를 보내지 않는다.**
 
 ---
 
@@ -1736,6 +1782,22 @@ type RecentRecordCard = {
 ```
 
 5.9 전용이다. `RecordDetail`(11.1)과 달리 `contexts` 필드 자체가 없다 — 본문을 담을 자리를 두지 않는다.
+
+## 11.6 `RecordCollectionCard`
+
+```typescript
+type RecordCollectionCard = {
+  collectionId: number;
+  title: string;
+  recordCount: number;
+  keywords: string[];          // PUBLIC 집계. 없으면 [] — null이 아니다
+  coverImageUrl: string | null;
+  publishedAt: string;
+  createdAt: string;
+};
+```
+
+5.10 전용이다. `CollectionDetail`(11.3)과 달리 `records`가 없고, Feed 항목(10.1)과 달리 `position`이 없다 — 목록 카드에 필요한 것만 싣는다.
 
 ---
 
