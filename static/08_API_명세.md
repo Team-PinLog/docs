@@ -210,6 +210,7 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 | Method | Endpoint | 설명 |
 |---|---|---|
 | GET | `/records/map` | 내 활성 Record 기반 지도 마커 조회 |
+| GET | `/records/map/keywords` | 지도에 보이는 범위의 내 키워드 상위 5건 (검색창 밑 추천 칩) |
 
 장소 검색은 서버 API가 아니다. 프론트가 카카오 로컬 API를 직접 호출하고, Record 생성 시 카카오 응답의 장소 데이터를 서버에 전달한다(5.1).
 
@@ -220,6 +221,7 @@ Record·Context 생성 및 수정 응답은 Keyword·Embedding 생성을 기다�
 | POST | `/records` | 카카오 Place와 첫 Context로 Record 생성 |
 | GET | `/records/{recordId}` | 내 Record 상세 조회 |
 | GET | `/records/by-place` | kakaoPlaceId로 이 장소의 내 활성 Record 조회 |
+| GET | `/records/recent` | 최근 7일 안에 만든 내 Record 목록 (홈 화면 최근 기록) |
 | DELETE | `/records/{recordId}` | Record 소프트 삭제. 마지막 Record인 Collection이 있으면 409 거절 |
 | DELETE | `/records/{recordId}/force` | 안내 확인 후 Record 강제 삭제. 연쇄 Collection 삭제 포함 |
 | POST | `/records/{recordId}/contexts` | Context 추가 |
@@ -542,11 +544,16 @@ Query:
 | `neLat` | X | 북동 위도 |
 | `neLng` | X | 북동 경도 |
 | `keyword` | X | 장소명·주소 부분 일치 검색어 |
+| `keywordId` | X | AI 키워드 id. 이 키워드가 붙은 Record만 남긴다 |
+
+**`keyword`와 `keywordId`는 다른 것이다.** `keyword`는 사용자가 검색창에 친 **글자**로 장소명·주소를 찾고, `keywordId`는 4.3이 내려준 **AI 키워드**로 Record를 거른다. 이름이 비슷하니 프론트에서 섞어 쓰지 않도록 주의한다.
 
 - bbox 파라미터 없이 호출하면(최초 진입) 내 **전체** 마커를 반환한다.
 - bbox를 주면 해당 범위의 마커만 반환한다(지도 이동 시).
 - `keyword`를 주면 장소명(`name`) **또는** 주소(`address`)에 검색어가 부분 일치(대소문자 무시)하는 마커만 반환한다. 생략하거나 빈 문자열·공백뿐이면 필터하지 않는다. `%`·`_`는 와일드카드가 아니라 문자 그대로 검색된다.
-- `keyword`는 bbox와 독립적으로 조합할 수 있다(AND). bbox의 "모두 주거나 모두 생략" 규칙에 `keyword`는 포함되지 않는다.
+- `keywordId`를 주면 그 키워드가 붙은 Record의 마커만 반환한다. 값은 4.3의 `items[].keywordId`를 그대로 넘긴다.
+- 존재하지 않거나 비활성·비공개 처리된 `keywordId`는 **400이 아니라 빈 `items`의 200**이다. 프리셋이 꺼지는 것은 사용자 잘못이 아니므로 오류로 다루지 않는다.
+- `keyword`·`keywordId`는 bbox와 독립적으로 조합할 수 있다(전부 AND). bbox의 "모두 주거나 모두 생략" 규칙에 이 둘은 포함되지 않는다.
 - 응답은 현재 로그인 사용자의 활성 Record와 연결된 Place만 포함한다.
 - `items`는 장소명 오름차순(동명이면 `recordId` 오름차순)으로 정렬된다.
 
@@ -566,7 +573,59 @@ Query:
 - 결과가 없으면 `bounds: null`, 1개면 해당 좌표의 점 사각형(sw = ne)이다.
 - `latestCollectionId`는 그 Record가 **가장 최근에 담긴** Collection의 id다(마커 색상 구분용). "가장 최근"은 컬렉션 내부 정렬과 같은 담은 시각 기준이며, 어느 Collection에도 담기지 않은 Record는 `null`이다. 컬렉션에서 뺀(삭제된) 연결은 판단에서 제외된다.
 
-## 4.3 발견한 Place 저장
+## 4.3 지도 범위의 내 키워드 상위 5건
+
+```http
+GET /api/core/v1/records/map/keywords?swLat={swLat}&swLng={swLng}&neLat={neLat}&neLng={neLng}
+```
+
+검색창 밑에 띄우는 추천 칩이다. 누르면 그 `keywordId`로 4.2를 다시 호출해 지도를 거른다.
+
+Query:
+
+| 이름 | 필수 | 설명 |
+|---|---:|---|
+| `swLat` | X | 남서 위도 |
+| `swLng` | X | 남서 경도 |
+| `neLat` | X | 북동 위도 |
+| `neLng` | X | 북동 경도 |
+
+- bbox 규칙은 4.2와 같다 — **넷 다 주거나 모두 생략**한다. 일부만 주면 400이다.
+- 개수는 서버가 5로 고정한다. 개수 파라미터가 없다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      { "keywordId": 12, "displayName": "카페", "recordCount": 12 },
+      { "keywordId": 7, "displayName": "산책", "recordCount": 5 }
+    ]
+  }
+}
+```
+
+- `recordCount`는 **Record 수**다. 같은 키워드가 한 Record의 Context 여러 개에 붙어 있어도 1로 센다 — 지도 핀 하나가 Record 하나이므로 칩의 숫자와 핀 개수가 같은 규칙으로 세어진다.
+- 집계 범위는 **전체 기간 × bbox 안**이다. 기간 파라미터는 없다.
+- 정렬은 `recordCount` 내림차순이고, 같으면 `keywordId` 오름차순이다.
+- 대상이 5개 미만이면 있는 만큼, 없으면 `items: []`인 200이다. 404가 아니다.
+- AI 판정이 끝나지 않은 Context는 집계에서 빠진다. 갓 만든 Record는 칩에 반영되기까지 시간이 걸린다.
+
+### 프론트 구현 규약
+
+**칩 계산은 bbox만 반영한다.** 검색창에 친 `keyword`도, 지금 적용 중인 `keywordId`도 반영하지 않는다. 적용 중인 필터를 반영하면 그 키워드를 뺀 나머지 칩이 전부 0이 되어 사라지고, 사용자가 다른 칩으로 갈아탈 수 없게 된다.
+
+**칩 숫자와 화면의 핀 수는 같아야 한다.** 같은 bbox에서 `keywordId`로 거른 4.2의 `items` 개수와 이 응답의 `recordCount`는 일치한다. 어긋나 보이면 두 요청의 bbox가 다른 것이다.
+
+**두 요청의 bbox 동기화는 프론트 책임이다.** 4.2와 4.3은 별도 호출이라 완료 순서에 보장이 없다. 빠르게 패닝하면 칩은 bbox A의 결과, 마커는 bbox B의 결과가 화면에 함께 뜰 수 있다. 요청마다 토큰을 들고 **늦게 도착한 응답을 버려야 한다.**
+
+호출 횟수를 줄이는 세 가지를 함께 적용한다.
+
+- **디바운스** — 지도 idle 후 약 300ms. 드래그 중 쏟아지는 이벤트를 1회로 접는다.
+- **bbox 양자화** — 뷰포트를 격자에 맞춰 반올림해서 보낸다. 미세한 팬이 같은 요청이 되어 재호출이 사라지고 직전 응답을 그대로 재사용할 수 있다.
+- **줌 임계** — 전국이 보이는 줌에서는 호출하지 않는다. 그 범위의 칩은 의미가 없다.
+
+## 4.4 발견한 Place 저장
 
 Feed나 공개 Collection에서 발견한 장소의 저장도 별도 API 없이 Record 생성(5.1)을 사용한다. 공개 응답에 포함된 장소 데이터를 그대로 전달한다.
 
@@ -815,6 +874,48 @@ DELETE /api/core/v1/records/{recordId}/force
 - Record·활성 Context 전체 소프트 삭제, Collection 연결 소프트 삭제, **마지막 Record였던 Collection 소프트 삭제**, AI 파생 데이터 무효화(State `CANCELLED` + Embedding `is_deleted`)를 한 트랜잭션으로 수행한다.
 - 204.
 - 연쇄 삭제 대상이 없어도 정상 수행한다(일반 삭제와 동일 결과).
+
+## 5.9 최근 Record 목록
+
+```http
+GET /api/core/v1/records/recent?cursor=&size=1
+```
+
+홈 화면의 "최근 기록" 영역이 쓴다. 최근 7일 안에 만든 **내** Record만 최신순으로 반환한다.
+
+> 조회 API이지만 5.4~5.8 뒤에 붙인 것은 번호를 밀지 않기 위해서다. 5.4~5.8은 본문 여러 곳과 백엔드 주석이 번호로 참조하고 있다.
+
+Query:
+
+| 이름 | 필수 | 설명 |
+|---|---:|---|
+| `cursor` | X | 1.4의 불투명 커서. 없으면 첫 페이지 |
+| `size` | X | **기본 1**. 0 이하는 1로, 100 초과는 100으로 접힌다 |
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "recordId": 8801,
+        "place": { },
+        "keywords": ["조용한", "디저트"],
+        "createdAt": "2026-08-06T11:20:31Z"
+      }
+    ],
+    "nextCursor": "MjAyNi0wOC0wNlQxMToyMDozMVosODgwMQ",
+    "hasNext": true
+  }
+}
+```
+
+- **기간은 서버가 7일로 고정한다.** 기간 파라미터가 없다.
+- **정렬은 `createdAt` 내림차순 고정이다.** 정렬 파라미터가 없다 — "최근"이 곧 정렬이다. 같은 시각은 `recordId` 내림차순으로 끊는다.
+- 카드에 **Context 본문이 없다.** 본문이 필요하면 `recordId`로 5.2를 호출한다.
+- `keywords`는 소유자 범위(`PUBLIC` + `PRIVATE_ONLY`) 집계이며, 없으면 `null`이 아니라 빈 배열이다. **AI 판정 전과 "키워드 0건"을 구분하지 않는다** — 6.1의 `keywordStatus`를 여기서는 제공하지 않으므로, 갓 만든 Record는 화면에 키워드 없이 그려진다.
+- 7일 안에 Record가 없으면 `items: []`인 200이다. 404가 아니다.
+- 페이징 도중 7일 경계는 요청마다 다시 계산된다. 커서를 오래 쥐고 있다가 다음 페이지를 부르면 경계에 걸친 항목이 빠질 수 있으나, 최신순이라 **이미 받은 항목이 다시 오지는 않는다.**
 
 ---
 
@@ -1623,6 +1724,19 @@ type CursorPage<T> = {
 };
 ```
 
+## 11.5 `RecentRecordCard`
+
+```typescript
+type RecentRecordCard = {
+  recordId: number;
+  place: PlaceSummary;
+  keywords: string[];   // 없으면 [] — null이 아니다
+  createdAt: string;
+};
+```
+
+5.9 전용이다. `RecordDetail`(11.1)과 달리 `contexts` 필드 자체가 없다 — 본문을 담을 자리를 두지 않는다.
+
 ---
 
 # 12. 접근 권한표
@@ -1763,6 +1877,18 @@ POST /collections { title, recordIds } (7.1)   -- 즉시 생성, coverImageUrl: 
 ```
 
 생성 완료 화면은 표지 자리에 스켈레톤을 먼저 그리고, 후보가 `done`이 되는 대로 채운다. 사용자가 화풍 선택 전에 떠나도 Collection은 이미 생성되어 있다(7.7).
+
+## 13.13 홈 화면 최근 기록
+
+```text
+GET /records/recent                              -- 최초 진입: 최신 1건
+GET /records/recent?cursor={nextCursor}          -- 카드를 넘길 때마다
+→ hasNext가 false면 더 넘기지 않는다
+```
+
+카드를 여러 장 미리 받아 두려면 `size`를 올린다. 카드에 Context 본문이 없으므로, 사용자가 카드를 눌러 상세로 들어가는 시점에 `recordId`로 5.2를 호출한다.
+
+최근 7일 안에 기록이 없으면 `items: []`가 온다. 오류가 아니므로 빈 화면 안내로 처리한다.
 
 ---
 
