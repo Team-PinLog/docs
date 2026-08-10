@@ -36,8 +36,8 @@
 | BE | `SPRING_DATA_REDIS_HOST` | 비민감 runtime variable | Infra / GitOps values | 없음 | — | Spring Data Redis |
 | BE | `SPRING_DATA_REDIS_PORT` | 비민감 runtime variable | Infra / GitOps values | 없음 | — | Spring Data Redis |
 | BE | `PINLOG_AI_BASE_URL` | 비민감 runtime variable | Infra / GitOps values | 없음 | — | Spring AI HTTP client |
-| AI | `GMS_API_KEY` | 민감 runtime Secret | AI / Environment Secret | `pinlog-secrets-dev` | `infra/secrets/dev/ai-owner-secrets.sealedsecret.yaml` | FastAPI GMS clients |
-| AI | `GMS_BASE_URL` | 비민감 endpoint(현재 봉인 전달) | AI / Environment Secret | `pinlog-secrets-dev` | 위와 같음 | FastAPI GMS clients |
+| AI | AI API key | 민감 runtime Secret | AI / Environment Secret | `pinlog-secrets-dev` | `infra/secrets/dev/ai-owner-secrets.sealedsecret.yaml` | FastAPI AI API client |
+| AI | AI API base URL | 비민감 endpoint(현재 봉인 전달) | AI / Environment Secret | `pinlog-secrets-dev` | 위와 같음 | FastAPI AI API client |
 | AI | `INTERNAL_SHARED_SECRET` | 민감 runtime Secret | AI / Environment Secret | `pinlog-secrets-dev` | 위와 같음 | FastAPI internal-auth verifier |
 | AI | `PINLOG_EMBEDDING_MODEL` | 비민감 optional override | AI 설정 owner | `pinlog-secrets-dev` | 위와 같음 | FastAPI `Settings` |
 | AI | `PINLOG_EMBEDDING_DIMENSION` | 비민감 optional override | AI 설정 owner | `pinlog-secrets-dev` | 위와 같음 | FastAPI `Settings` |
@@ -96,6 +96,6 @@ kubectl -n <namespace> describe deployment/<service>
 - 새 ReplicaSet이 기대 image SHA+digest와 Secret revision annotation을 사용하고, old ReplicaSet이 scale-down 되었는지 확인합니다.
 - startup → readiness가 성공한 뒤 liveness가 안정적인지, restart count·Unavailable replica·경고 Event가 증가하지 않는지 확인합니다.
 - Backend는 `/api/core/actuator/health/liveness`, `/api/core/actuator/health/readiness`, PostgreSQL/Flyway, Redis, OAuth redirect, AI internal round-trip을 확인합니다.
-- AI는 `/health`, `/ready`, DB schema/pgvector 접근, embedding profile 일치, GMS round-trip을 확인합니다.
+- AI는 `/health`, `/ready`, DB schema/pgvector 접근, embedding profile 일치, AI API round-trip을 확인합니다.
 - Front는 immutable image identity와 외부 HTTPS, API base path, Kakao 지도/검색 smoke를 확인합니다.
 - 로그에는 key 이름과 revision만 허용하며 값·Authorization header·DATABASE_URL은 출력하지 않습니다.
