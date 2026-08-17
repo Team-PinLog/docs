@@ -903,7 +903,7 @@ DELETE /api/core/v1/records/{recordId}
 ```
 
 - 프론트는 이 Record가 어떤 Collection의 마지막 Record인지 알 수 없다. 서버가 DB에서 확인한다.
-- 마지막 Record인 활성 Collection이 없으면: Record·Context 소프트 삭제, Collection 연결 소프트 삭제, AI 파생 데이터 무효화 — State `CANCELLED` + Embedding `is_deleted`(204). 물리 삭제 시점은 미결이며 별도 개인정보 정책을 따른다([06 §1.1](06_데이터모델_및_무결성.md)).
+- 마지막 Record인 활성 Collection이 없으면: Record·Context 소프트 삭제, Collection 연결 소프트 삭제, AI 파생 데이터 무효화 — State `CANCELLED` + Embedding `is_deleted`(204). 물리 삭제 시점은 [개인정보 파기 정책](13_개인정보_파기정책.md)을 따른다(무효화 후 90일, [06 §1.1](06_데이터모델_및_무결성.md)).
 - 마지막 Record인 활성 Collection이 있으면: 삭제하지 않고 409로 거절한다.
 
 ```http

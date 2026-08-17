@@ -22,6 +22,7 @@ PinLog은 장소를 `Context`와 함께 `Record`로 저장하고, 자연어로 �
 | [MVP 기능범위](static/10_MVP_기능범위.md) | 포함·제외 기능 |
 | [인증 설계](static/11_인증_설계.md) | 인증 방식 결정과 근거, 클라이언트 계약 |
 | [배포 변수 및 Secret 표준](static/12_배포_변수_및_Secret_표준.md) | FE·BE·AI·Infra 변수/Secret owner, 전달 위치, 승인·rotation·rollback·rollout 계약 |
+| [개인정보 파기 정책](static/13_개인정보_파기정책.md) | 삭제·탈퇴 이후의 파기 시점과 방식, 항목별 보유 기간 |
 
 ## 기준
 
